@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 🛡️ Helper: Check if the requester is the system Administrator
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "heyydean001@gmail.com"
+      );
+    }
+
+    // 👤 Users Collection: Primary Identity Registry
+    match /users/{userId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+      
+      // Allow students to read/write their own semester data
+      match /semesters/{semId} {
+        allow read, write: if request.auth.uid == userId || isAdmin();
+      }
+      
+      match /placementMetrics/{docId} {
+        allow read, write: if request.auth.uid == userId || isAdmin();
+      }
+    }
+
+    // 🎓 Students Collection: Dashboard Registry for Faculty
+    match /students/{studentId} {
+      allow read: if request.auth != null; // Faculty and Admins need read access for dashboards
+      allow create, update: if request.auth != null && (request.auth.uid == studentId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // 👨‍🏫 Faculty Collection: Dashboard Registry for Admin
+    match /faculty/{facultyId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && (request.auth.uid == facultyId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // 🚨 System Issues: Error Logging
+    match /system_issues/{logId} {
+      allow create: if true; // Allow anyone to log a system issue (error)
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // 🔓 Faculty Approvals
+    match /facultyApprovals/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 🚫 Global Deny: Catch-all restriction
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

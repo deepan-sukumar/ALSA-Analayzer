@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# project logs
+*.log
+*.txt
+scripts/
+src/scripts/
+capture_tsc.js
+verification_check.ts
