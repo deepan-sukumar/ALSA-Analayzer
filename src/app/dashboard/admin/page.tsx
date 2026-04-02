@@ -217,9 +217,21 @@ export default function AdminDashboard() {
                     <CardContent className="pl-2">
                         <ResponsiveContainer width="100%" height={350}>
                             <BarChart data={analytics.modulePerformance}>
-                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#000000" strokeOpacity={0.2} />
+                                <XAxis
+                                    dataKey="name"
+                                    fontSize={12}
+                                    tickLine={{ stroke: "#000000" }}
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tick={{ fill: "#000000" }}
+                                />
+                                <YAxis
+                                    fontSize={12}
+                                    tickLine={{ stroke: "#000000" }}
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tick={{ fill: "#000000" }}
+                                    domain={[0, 100]}
+                                />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     cursor={{ fill: 'transparent' }}

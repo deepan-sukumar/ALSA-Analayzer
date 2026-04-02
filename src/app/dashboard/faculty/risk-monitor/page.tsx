@@ -54,7 +54,7 @@ export default function RiskMonitorPage() {
     const analyzedStudents = useMemo(() => {
         return allStudents.map(student => {
             const priData = calculatePRI(student);
-            let riskCategory = student.riskLevel || "High";
+            const riskCategory = student.riskLevel || "High";
             const breakdown = priData.breakDown;
             const scores = [
                 { name: "Academic", score: breakdown.academic },
@@ -295,11 +295,13 @@ export default function RiskMonitorPage() {
                 </div>
             </div>
 
-            <StudentDetailsSheet
-                open={!!selectedStudent}
-                onOpenChange={(open) => !open && setSelectedStudent(null)}
-                student={selectedStudent}
-            />
+            {selectedStudent && (
+                <StudentDetailsSheet
+                    open={!!selectedStudent}
+                    onOpenChange={(open) => !open && setSelectedStudent(null)}
+                    student={selectedStudent}
+                />
+            )}
         </div>
     );
 }

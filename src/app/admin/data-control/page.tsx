@@ -269,6 +269,26 @@ export default function AdminDataControl() {
         }
     };
 
+    const handleSyncStudents = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await fetch("/api/admin/sync-students", {
+                method: "POST"
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success(`Sync protocol complete. ${data.stats?.synced || data.synchronizedCount || 0} nodes synchronized.`);
+            } else {
+                toast.error(`Sync fault: ${data.message || "Unknown error"}`);
+            }
+        } catch (e: any) {
+            toast.error("System sync intercepted externally.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <div className="space-y-10 animate-in fade-in duration-700 pb-12">
             {/* Premium Data Engine Hero */}
@@ -340,6 +360,14 @@ export default function AdminDataControl() {
                     </CardHeader>
                     <CardContent className="p-8 space-y-6">
                         {[
+                            {
+                                title: "Dataset Synchronization",
+                                desc: "Executes atomic sync protocol to populate and normalize baseline student records from the external data-store to the active system.",
+                                icon: Shield,
+                                action: handleSyncStudents,
+                                loading: isSyncing,
+                                btnText: "Execute System Sync"
+                            },
                             {
                                 title: "Recalculate PRI Vectors",
                                 desc: "Re-triggers weighted calculations across the student spectrum to refresh cached placement indices.",

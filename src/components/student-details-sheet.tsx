@@ -22,13 +22,15 @@ import {
     Code,
     Database,
     Target,
-    BrainCircuit
+    BrainCircuit,
+    Loader2,
+    Clock
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { calculateReadinessScore, getRiskLevel, generateDrawbacks } from "@/lib/faculty-logic";
-import { generateFacultyStudentRoadmap } from "@/lib/faculty-insights";
-import { doc, deleteDoc } from "firebase/firestore";
+import { calculateReadinessScore, getRiskLevel } from "@/lib/faculty-logic";
+import { useEffect, useState } from "react";
+import { doc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -61,8 +63,58 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
 
     const readinessScore = calculateReadinessScore(student);
     const riskLevel = getRiskLevel(readinessScore);
-    const drawbacks = generateDrawbacks(student);
-    const roadmap = generateFacultyStudentRoadmap(student);
+
+    const [drawbacks, setDrawbacks] = useState<any[]>([]);
+    const [roadmap, setRoadmap] = useState<any[]>([]);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [verificationHistory, setVerificationHistory] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchVerificationHistory = async () => {
+            if (!student?.id || !open) return;
+            try {
+                const q = query(
+                    collection(db, "verificationResults"),
+                    where("userId", "==", student.id)
+                );
+                const snap = await getDocs(q);
+                const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                rows.sort((a: any, b: any) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                setVerificationHistory(rows);
+            } catch (error) {
+                console.error("Error fetching verification history:", error);
+            }
+        };
+
+        fetchVerificationHistory();
+    }, [student?.id, open]);
+
+    useEffect(() => {
+        const fetchAiRecommendations = async () => {
+            if (!student || !open) return;
+
+            setIsAiLoading(true);
+            try {
+                const res = await fetch('/api/ai-recommendations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    setDrawbacks(data.drawbacks || []);
+                    setRoadmap(data.roadmap || []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch AI recommendations", error);
+            } finally {
+                setIsAiLoading(false);
+            }
+        };
+
+        fetchAiRecommendations();
+    }, [student, open]);
 
     const getRiskColor = (risk: string) => {
         switch (risk.toLowerCase()) {
@@ -94,7 +146,7 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
             <SheetContent className="sm:max-w-3xl w-full flex flex-col h-full p-0 gap-0 overflow-hidden bg-white dark:bg-slate-900 dark:bg-slate-950">
                 <SheetHeader className="sr-only">
                     <SheetTitle>Student Profile Details</SheetTitle>
-                    <SheetDescription>Detailed view of the student's academic, portfolio, and placement metrics.</SheetDescription>
+                    <SheetDescription>Detailed view of the student&apos;s academic, portfolio, and placement metrics.</SheetDescription>
                 </SheetHeader>
                 {/* Header Section - Modernized & Compact */}
                 <div className="bg-white dark:bg-slate-900 relative z-10 border-b border-slate-200 dark:border-slate-700 shadow-sm">
@@ -110,11 +162,32 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
                                 </Avatar>
 
                                 <div>
-                                    <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
+                                    <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex flex-wrap items-center gap-2">
                                         {student.name}
                                         <Badge className={`${getRiskColor(riskLevel)} bg-opacity-10 border shadow-none px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded-md`}>
                                             {riskLevel} Risk
                                         </Badge>
+                                        
+                                        {/* Latest Score & Total Attempts Summary */}
+                                        {verificationHistory.length > 0 && (
+                                            <div className="flex items-center gap-1.5 ml-1">
+                                                <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-md shadow-sm">
+                                                    <ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                                    <span className="text-[10px] font-black text-amber-700 dark:text-amber-300">
+                                                        {verificationHistory.length} Attempts
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 px-2 py-0.5 rounded-md shadow-sm">
+                                                    <Target className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                                                    <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-300">
+                                                        Latest: {verificationHistory[0].score}/10
+                                                    </span>
+                                                </div>
+                                                {verificationHistory[0].passed && (
+                                                    <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0 h-4">VERIFIED</Badge>
+                                                )}
+                                            </div>
+                                        )}
                                     </h2>
                                     <div className="flex items-center gap-2 mt-1">
                                         <Badge variant="secondary" className="font-mono text-[10px] bg-slate-100 dark:bg-slate-900/50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">{student.registerNumber || student.registerNo || "N/A"}</Badge>
@@ -129,8 +202,8 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
                                     </div>
                                 </div>
                             </div>
-
-                            <Button variant="outline" size="sm" onClick={handleStudentDelete} className="text-red-600 dark:text-red-400 font-bold border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm hidden md:flex">
+ 
+                             <Button variant="outline" size="sm" onClick={handleStudentDelete} className="text-red-600 dark:text-red-400 font-bold border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm hidden md:flex">
                                 <ShieldAlert className="h-4 w-4 mr-2" />
                                 Remove Student
                             </Button>
@@ -146,7 +219,7 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
                             <TabsTrigger value="academic" className="rounded-full px-5 py-2 text-xs font-bold data-[state=active]:bg-white dark:bg-slate-900 dark:data-[state=active]:bg-slate-700 data-[state=active]:text-indigo-700 dark:text-indigo-400 dark:data-[state=active]:text-indigo-300 data-[state=active]:shadow-sm transition-all duration-300">Academic</TabsTrigger>
                             <TabsTrigger value="placement" className="rounded-full px-5 py-2 text-xs font-bold data-[state=active]:bg-white dark:bg-slate-900 dark:data-[state=active]:bg-slate-700 data-[state=active]:text-indigo-700 dark:text-indigo-400 dark:data-[state=active]:text-indigo-300 data-[state=active]:shadow-sm transition-all duration-300">Placement</TabsTrigger>
                             <TabsTrigger value="portfolio" className="rounded-full px-5 py-2 text-xs font-bold data-[state=active]:bg-white dark:bg-slate-900 dark:data-[state=active]:bg-slate-700 data-[state=active]:text-indigo-700 dark:text-indigo-400 dark:data-[state=active]:text-indigo-300 data-[state=active]:shadow-sm transition-all duration-300">Portfolio</TabsTrigger>
-                            <TabsTrigger value="analytics" className="rounded-full px-5 py-2 text-xs font-bold data-[state=active]:bg-white dark:bg-slate-900 dark:data-[state=active]:bg-slate-700 data-[state=active]:text-indigo-700 dark:text-indigo-400 dark:data-[state=active]:text-indigo-300 data-[state=active]:shadow-sm transition-all duration-300">Risk Roadmaps</TabsTrigger>
+                            <TabsTrigger value="verification" className="rounded-full px-5 py-2 text-xs font-bold data-[state=active]:bg-white dark:bg-slate-900 dark:data-[state=active]:bg-slate-700 data-[state=active]:text-indigo-700 dark:text-indigo-400 dark:data-[state=active]:text-indigo-300 data-[state=active]:shadow-sm transition-all duration-300 text-amber-600 dark:text-amber-400">Verification Logs</TabsTrigger>
                         </TabsList>
                     </div>
 
@@ -206,16 +279,33 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
                                     </CardHeader>
                                     <CardContent className="p-5 bg-white dark:bg-slate-900">
                                         <div className="space-y-4">
-                                            {drawbacks.length > 0 ? (
+                                            {isAiLoading ? (
+                                                <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+                                                    <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                                                    <p className="text-sm font-medium">Generating Faculty Insights...</p>
+                                                </div>
+                                            ) : drawbacks.length > 0 ? (
                                                 <div className="grid gap-3">
                                                     {drawbacks.map((item, idx) => (
-                                                        <div key={idx} className="flex gap-4 p-4 rounded-xl border bg-amber-50/60 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50 shadow-sm transition-transform hover:-translate-y-0.5">
-                                                            <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg h-fit">
-                                                                <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-400 shrink-0" />
+                                                        <div key={idx} className="p-4 rounded-xl border bg-amber-50/60 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50 shadow-sm transition-transform hover:-translate-y-0.5 flex flex-col gap-2 relative overflow-hidden">
+                                                            <div className="absolute top-0 left-0 w-1 h-full bg-amber-400 dark:bg-amber-600 rounded-l-xl opacity-50" />
+
+                                                            {/* Fault / Weakness */}
+                                                            <div className="flex gap-2.5 text-slate-800 dark:text-white pb-2 border-b border-amber-200/50 dark:border-amber-800/50">
+                                                                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-500 mt-0.5" />
+                                                                <div>
+                                                                    <span className="font-black text-[10px] uppercase tracking-wider text-rose-600 dark:text-rose-400">Fault / Weakness</span>
+                                                                    <p className="font-bold text-sm mt-0.5">{item.drawback}</p>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-slate-800 dark:text-white">{item.drawback}</p>
-                                                                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 font-medium">{item.suggestion}</p>
+
+                                                            {/* Correction / Fix */}
+                                                            <div className="flex gap-2.5 text-slate-800 dark:text-white pt-1">
+                                                                <div className="h-4 w-4 shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mt-0.5"><CheckCircle2 className="h-3 w-3" /></div>
+                                                                <div>
+                                                                    <span className="font-black text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Correction / Idea to Improve</span>
+                                                                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed mt-0.5">{item.suggestion}</p>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -506,6 +596,58 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
                                 </div>
                             </TabsContent>
 
+                            {/* VERIFICATION TAB */}
+                            <TabsContent value="verification" className="mt-0 space-y-6">
+                                <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 border-l-4 border-l-amber-500">
+                                    <CardHeader className="pb-3 border-b border-slate-200 dark:border-slate-700 bg-amber-50/30 dark:bg-amber-950/20">
+                                        <CardTitle className="text-sm flex items-center gap-2 font-bold text-slate-800 dark:text-white">
+                                            <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Topic Verification Attempt History
+                                        </CardTitle>
+                                        <CardDescription className="text-xs">Security logs for AI-generated concept validation tests</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="p-5">
+                                        <div className="space-y-4">
+                                            {verificationHistory.length > 0 ? (
+                                                verificationHistory.map((log, idx) => (
+                                                    <div key={idx} className={`p-4 rounded-xl border transition-all hover:shadow-md ${log.passed ? 'bg-emerald-50/30 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50' : 'bg-red-50/30 dark:bg-red-950/20 border-red-100 dark:border-red-900/50'}`}>
+                                                        <div className="flex justify-between items-start mb-3">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Badge className={log.passed ? "bg-emerald-600" : "bg-red-600"}>
+                                                                        {log.passed ? "PASSED" : "FAILED"}
+                                                                    </Badge>
+                                                                    <span className="text-xs font-bold text-slate-500">Attempt #{log.attemptNumber || 1}</span>
+                                                                </div>
+                                                                <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400 mt-2">Topics Tested:</p>
+                                                                <p className="text-xs font-bold text-slate-700 dark:text-white mt-0.5">
+                                                                    {Array.isArray(log.topicsVerified) ? log.topicsVerified.join(", ") : "N/A"}
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-2xl font-black text-slate-800 dark:text-white">{log.score}/10</div>
+                                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase justify-end">
+                                                                    <Clock className="h-3 w-3" />
+                                                                    {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleDateString() : 'Recent'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/50 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                            <span>Integrity Method: AI Dynamic Generation</span>
+                                                            {log.passed && <span className="text-emerald-600">PRI UPDATED ✅</span>}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                                                    <p className="text-sm font-bold text-slate-400 italic">No verification attempts found for this student.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+
                             {/* ANALYTICS TAB */}
                             <TabsContent value="analytics" className="mt-0 space-y-6">
                                 <Card className="border-l-4 border-l-indigo-500 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
@@ -549,36 +691,43 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
                                                 <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" /> Smart Recovery Roadmap
                                             </CardTitle>
                                             <CardDescription className="text-xs text-red-700/80 dark:text-red-400/80">
-                                                AI-generated intervention plan specifically designed to fix {student.name}'s weakest areas.
+                                                AI-generated intervention plan specifically designed to fix {student.name}&apos;s weakest areas.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="p-5 space-y-5 bg-white dark:bg-slate-900">
-                                            {roadmap.map((phase, idx) => (
-                                                <div key={idx} className={`p-5 rounded-xl border flex gap-4 transition-all hover:shadow-md ${phase.priority === 'Critical' ? 'bg-red-50/60 dark:bg-red-950/30 border-red-100 dark:border-red-900/50' : phase.priority === 'High' ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50' : 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50'}`}>
-                                                    <div className="flex-1 space-y-2">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`rounded-full p-1.5 h-fit ${phase.priority === 'Critical' ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400' : phase.priority === 'High' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400'}`}>
-                                                                    {phase.priority === "Critical" ? <ShieldAlert className="h-3 w-3" /> : phase.priority === "High" ? <TrendingUp className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                                            {isAiLoading ? (
+                                                <div className="flex flex-col items-center justify-center py-10 text-red-700/80">
+                                                    <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                                                    <p className="text-sm font-medium">AI is designing targeted recovery roadmap...</p>
+                                                </div>
+                                            ) : (
+                                                roadmap.map((phase, idx) => (
+                                                    <div key={idx} className={`p-5 rounded-xl border flex gap-4 transition-all hover:shadow-md ${phase.priority === 'Critical' ? 'bg-red-50/60 dark:bg-red-950/30 border-red-100 dark:border-red-900/50' : phase.priority === 'High' ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50' : 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50'}`}>
+                                                        <div className="flex-1 space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className={`rounded-full p-1.5 h-fit ${phase.priority === 'Critical' ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400' : phase.priority === 'High' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400'}`}>
+                                                                        {phase.priority === "Critical" ? <ShieldAlert className="h-3 w-3" /> : phase.priority === "High" ? <TrendingUp className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                                                                    </div>
+                                                                    <h4 className="font-black text-sm text-slate-800 dark:text-white">{phase.week}</h4>
                                                                 </div>
-                                                                <h4 className="font-black text-sm text-slate-800 dark:text-white">{phase.week}</h4>
+                                                                <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wider ${phase.priority === 'Critical' ? 'text-red-700 dark:text-red-400 dark:text-red-300 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40' : phase.priority === 'High' ? 'text-amber-700 dark:text-amber-400 dark:text-amber-300 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40' : 'text-blue-700 dark:text-blue-400 dark:text-blue-300 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40'}`}>
+                                                                    {phase.priority} Priority
+                                                                </Badge>
                                                             </div>
-                                                            <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wider ${phase.priority === 'Critical' ? 'text-red-700 dark:text-red-400 dark:text-red-300 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40' : phase.priority === 'High' ? 'text-amber-700 dark:text-amber-400 dark:text-amber-300 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40' : 'text-blue-700 dark:text-blue-400 dark:text-blue-300 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40'}`}>
-                                                                {phase.priority} Priority
-                                                            </Badge>
-                                                        </div>
-                                                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-700/60 pb-2 mb-2">{phase.focus}</p>
-                                                        <div className="space-y-2.5 pt-1">
-                                                            {phase.tasks.map((task, tIdx) => (
-                                                                <div key={tIdx} className="text-xs flex items-start gap-3">
-                                                                    <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${phase.priority === 'Critical' ? 'bg-red-400' : phase.priority === 'High' ? 'bg-amber-400' : 'bg-blue-400'}`} />
-                                                                    <span className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed">{task}</span>
-                                                                </div>
-                                                            ))}
+                                                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-700/60 pb-2 mb-2">{phase.focus}</p>
+                                                            <div className="space-y-2.5 pt-1">
+                                                                {phase.tasks.map((task: string, tIdx: number) => (
+                                                                    <div key={tIdx} className="text-xs flex items-start gap-3">
+                                                                        <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${phase.priority === 'Critical' ? 'bg-red-400' : phase.priority === 'High' ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                                                                        <span className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed">{task}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ))
+                                            )}
                                         </CardContent>
                                     </Card>
                                 )}

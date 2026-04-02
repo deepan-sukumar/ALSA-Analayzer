@@ -74,7 +74,7 @@ export default function AdminDashboard() {
         const riskCounts = { Ready: 0, Moderate: 0, High: 0, Critical: 0 };
         const moduleScores = { academic: 0, core: 0, role: 0, aptitude: 0, enrichment: 0 };
         let totalPRI = 0;
-        let consistencyTrendData: any[] = [];
+        const consistencyTrendData: any[] = [];
 
         students.forEach((student, index) => {
             const priData = calculatePRI(student);
@@ -445,17 +445,17 @@ export default function AdminDashboard() {
                                     </defs>
                                     <XAxis
                                         dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }}
+                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                        tickLine={{ stroke: "#000000" }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
                                         dy={10}
                                     />
                                     <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }}
+                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                        tickLine={{ stroke: "#000000" }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
                                     />
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.1)" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
                                     <Tooltip
                                         contentStyle={{
                                             backgroundColor: '#0f172a',
@@ -504,9 +504,23 @@ export default function AdminDashboard() {
                         <div className="h-[350px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={analytics.modulePerformance} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
-                                    <XAxis dataKey="name" fontSize={10} fontWeight="black" tickLine={false} axisLine={false} tick={{ dy: 10 }} />
-                                    <YAxis fontSize={10} fontWeight="bold" tickLine={false} axisLine={false} domain={[0, 100]} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                    <XAxis
+                                        dataKey="name"
+                                        fontSize={10}
+                                        fontWeight="black"
+                                        tickLine={{ stroke: "#000000" }}
+                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                        tick={{ dy: 10, fill: "#000000" }}
+                                    />
+                                    <YAxis
+                                        fontSize={10}
+                                        fontWeight="bold"
+                                        tickLine={{ stroke: "#000000" }}
+                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                        tick={{ fill: "#000000" }}
+                                        domain={[0, 100]}
+                                    />
                                     <Tooltip
                                         cursor={{ fill: '#f1f5f9' }}
                                         contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold' }}

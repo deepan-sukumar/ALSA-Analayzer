@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
+import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
+
+// Initialize Firebase Admin SDK inline (no separate module needed)
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+    });
+}
+
+const adminDb = admin.firestore();
 
 export async function POST() {
     try {
@@ -11,7 +21,7 @@ export async function POST() {
         const batch = adminDb.batch();
         let count = 0;
 
-        usersSnap.forEach(docSnap => {
+        usersSnap.forEach((docSnap: QueryDocumentSnapshot) => {
             const data = docSnap.data();
             const studentId = data.id || data.registerNumber || data.registerNo;
             if (!studentId) return;

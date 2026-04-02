@@ -44,10 +44,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type UserDocData = { id: string; [key: string]: any };
+
 /**
  * Build an AppUser object from a Firestore document snapshot.
  */
-function firestoreDocToAppUser(docData: Record<string, any>): AppUser {
+function firestoreDocToAppUser(docData: UserDocData): AppUser {
     return {
         id: docData.id,
         name: docData.name ?? "",
@@ -90,10 +92,47 @@ function firestoreDocToAppUser(docData: Record<string, any>): AppUser {
         coreAcademicProfile: docData.coreAcademicProfile,
         roleTrackProfile: docData.roleTrackProfile,
         coreAcademicTopics: docData.coreAcademicTopics,
+        verifiedCoreTopics: docData.verifiedCoreTopics,
+        verifiedRoleConcepts: docData.verifiedRoleConcepts,
+        verificationScore: docData.verificationScore,
+        failedVerifications: docData.failedVerifications,
 
         // Final Calc
         academicOutcomeIndex: docData.academicOutcomeIndex
     };
+}
+
+/**
+ * Faculty approval can be edited from different admin surfaces.
+ * Reconcile users/{uid} with faculty/{uid} to avoid stale pending redirects.
+ */
+async function reconcileFacultyData(uid: string, rawDocData: UserDocData): Promise<UserDocData> {
+    const role = rawDocData.role?.toLowerCase?.() ?? rawDocData.role;
+    if (role !== "faculty") return rawDocData;
+
+    const facultyData = await getFacultyDocument(uid);
+    if (!facultyData) return rawDocData;
+
+    const approvedFromAnySource =
+        rawDocData.approved === true || (facultyData as any).approved === true;
+
+    const mergedData: UserDocData = {
+        ...rawDocData,
+        ...facultyData,
+        role: "faculty",
+        approved: approvedFromAnySource ? true : rawDocData.approved
+    };
+
+    // Self-heal stale users/{uid}.approved so future logins are clean.
+    if (approvedFromAnySource && rawDocData.approved !== true) {
+        try {
+            await updateUserDocument(uid, { approved: true });
+        } catch (syncError) {
+            console.error("Failed to sync faculty approval to users collection:", syncError);
+        }
+    }
+
+    return mergedData;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -106,22 +145,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
             if (firebaseUser) {
                 try {
-                    // Check if we already have a user state from a manual login/signup flow
-                    // to prevent double-redirection or race conditions.
-                    if (user && user.id === firebaseUser.uid && !window.location.pathname.includes("login")) {
-                        setIsLoading(false);
-                        return;
-                    }
-
                     let docData = await getUserDocument(firebaseUser.uid);
 
-                    // PRIORITY: If a student record exists in "users" by email, it OVERRIDES everything (UID doc or faculty collection doc).
-                    if (firebaseUser.email) {
+                    // IMPORTANT: Always trust UID document first.
+                    // Email-based lookup is only for account recovery when UID doc is missing.
+                    if (!docData && firebaseUser.email) {
                         const emailData = await getUserByEmail(firebaseUser.email);
-                        if (emailData && (emailData as any).role === "student") {
+                        if (emailData) {
                             docData = emailData as any;
                             if (emailData.id !== firebaseUser.uid) {
                                 await createUserDocument(firebaseUser.uid, { ...emailData, uid: firebaseUser.uid });
+                                docData = { ...emailData, id: firebaseUser.uid } as any;
                             }
                         }
                     }
@@ -130,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (!docData) {
                         const studentSnap = await getDoc(doc(db, "students", firebaseUser.uid));
                         if (studentSnap.exists()) {
-                            docData = { ...studentSnap.data(), role: "student" } as any;
+                            docData = { id: firebaseUser.uid, ...studentSnap.data(), role: "student" } as any;
                         } else {
                             const facultyData = await getFacultyDocument(firebaseUser.uid);
                             if (facultyData && (facultyData as any).role !== "student") {
@@ -139,11 +173,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         }
                     }
 
+                    if (docData) {
+                        docData = await reconcileFacultyData(firebaseUser.uid, docData as UserDocData);
+                    }
+
                     const providerId = firebaseUser.providerData[0]?.providerId || "password";
                     const hasPwd = firebaseUser.providerData.some(p => p.providerId === "password");
 
                     if (docData) {
                         const anyData = docData as any;
+                        // Self-heal student verification fields if they were lost from users/{uid}
+                        if (
+                            anyData.role === "student" &&
+                            (!anyData.verifiedCoreTopics || Object.keys(anyData.verifiedCoreTopics || {}).length === 0)
+                        ) {
+                            const studentSnap = await getDoc(doc(db, "students", firebaseUser.uid));
+                            if (studentSnap.exists()) {
+                                const studentData = studentSnap.data() as any;
+                                const recoveredUpdates: Record<string, any> = {};
+
+                                if (studentData.verifiedCoreTopics) recoveredUpdates.verifiedCoreTopics = studentData.verifiedCoreTopics;
+                                if (studentData.verifiedRoleConcepts) recoveredUpdates.verifiedRoleConcepts = studentData.verifiedRoleConcepts;
+                                if (studentData.coreAcademicTopics) recoveredUpdates.coreAcademicTopics = studentData.coreAcademicTopics;
+                                if (studentData.outcomeAlignment) recoveredUpdates.outcomeAlignment = studentData.outcomeAlignment;
+
+                                if (Object.keys(recoveredUpdates).length > 0) {
+                                    await updateUserDocument(firebaseUser.uid, recoveredUpdates);
+                                    docData = { ...anyData, ...recoveredUpdates };
+                                }
+                            }
+                        }
+
                         // FORCE ADMIN CHECK (Internal override)
                         if (firebaseUser.email?.toLowerCase() === "heyydean001@gmail.com") {
                             anyData.role = "admin";
@@ -154,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         }
 
                         const appUser = {
-                            ...firestoreDocToAppUser(docData),
+                            ...firestoreDocToAppUser(docData as UserDocData),
                             loginProvider: providerId,
                             hasPassword: hasPwd
                         };
@@ -196,7 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => unsubscribe();
-    }, [user?.id]);
+    }, []);
 
     // ─── Email / Password Login ───
     const login = async (data: { email: string; password: string }) => {
@@ -215,6 +275,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!docData) {
             throw new Error("Account data not found. Please register first.");
         }
+
+        docData = await reconcileFacultyData(credential.user.uid, docData as UserDocData);
 
         const hasPwd = credential.user.providerData.some(p => p.providerId === "password");
         const appUser = {
@@ -271,9 +333,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const isComplete = !!appUser.department && !!appUser.designation;
             if (!isComplete) {
                 if (!path.startsWith("/complete-faculty-profile")) router.push("/complete-faculty-profile");
-            } else if (!appUser.approved) {
+            } else if (appUser.approved === false) {
                 if (!path.startsWith("/faculty/pending-approval")) router.push("/faculty/pending-approval");
-            } else {
+            } else if (appUser.approved === true) {
                 if (!passive || (path === "/" || path === "/login" || path === "/signup")) {
                     router.push("/dashboard/faculty");
                 }
@@ -375,14 +437,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.log("Popup blocked, falling back to redirect...");
                     toast.info("Pop-up blocked. Redirecting to Google Login...");
                     await signInWithRedirect(auth, provider);
-                    return; // Redirect will happen, execution stops here
+                    return; 
                 }
                 throw popupError;
             }
             const firebaseUser = result.user;
             const uid = firebaseUser.uid;
 
-            // --- 1. ADMIN CHECK (Highest Priority for specific email) ---
+            // --- 1. ADMIN CHECK (Highest Priority) ---
             const isDean = firebaseUser.email?.toLowerCase() === "heyydean001@gmail.com";
             if (isDean) {
                 const existingDoc = await getUserDocument(uid);
@@ -404,104 +466,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // --- 2. UID SEARCH (Fastest & Main Way) ---
-            const existing = await getUserDocument(uid);
+            // --- 2. ACCOUNT RECOVERY & SOURCE OF TRUTH ---
+            let docData = await getUserDocument(uid);
 
-            // PRIORITY: Respect the intent from login page
-            if (preferredRole && existing && (existing as any).role !== preferredRole) {
-                // User has an account but wants a DIFFERENT role.
-                // We treat them as a "Skeleton" for the new role.
-                const skeletonUser: AppUser = {
-                    id: uid,
-                    uid: uid,
-                    email: firebaseUser.email || "",
-                    name: firebaseUser.displayName || "New User",
-                    role: preferredRole as any,
-                    gender: "OTHER",
-                    loginProvider: "google.com",
-                    hasPassword: firebaseUser.providerData.some(p => p.providerId === "password")
-                } as AppUser;
-                setUser(skeletonUser);
-                toast.info(`Creating a new ${preferredRole} profile...`);
-                handleRoleRedirection(skeletonUser);
-                return;
+            // FALLBACK: Email-based lookup (Handles pre-registered students by register number)
+            if (!docData && firebaseUser.email) {
+                const emailRecord = await getUserByEmail(firebaseUser.email);
+                if (emailRecord) {
+                    docData = emailRecord as any;
+                    if (emailRecord.id !== uid) {
+                        await createUserDocument(uid, { ...emailRecord, uid: uid });
+                        docData = { ...emailRecord, id: uid } as any;
+                    }
+                }
             }
 
-            if (existing) {
+            // FALLBACK: Legacy collection check
+            if (!docData) {
+                const studentSnap = await getDoc(doc(db, "students", uid));
+                if (studentSnap.exists()) {
+                    docData = { id: uid, ...studentSnap.data(), role: "student" } as any;
+                } else {
+                    const facultySnap = await getDoc(doc(db, "faculty", uid));
+                    if (facultySnap.exists()) {
+                        docData = { ...facultySnap.data(), role: "faculty" } as any;
+                    }
+                }
+            }
+
+            if (docData) {
+                docData = await reconcileFacultyData(uid, docData as UserDocData);
                 const appUser = {
-                    ...firestoreDocToAppUser(existing),
+                    ...firestoreDocToAppUser(docData),
                     loginProvider: "google.com",
                     hasPassword: firebaseUser.providerData.some(p => p.providerId === "password")
                 };
                 setUser(appUser);
-                toast.success(`Logged in as ${appUser.role}`);
+                
+                // Prioritize existing role over intent
+                if (preferredRole && appUser.role !== preferredRole) {
+                    toast.info(`Welcome back. Accessing your ${appUser.role} account.`);
+                } else {
+                    toast.success(`Logged in as ${appUser.role}`);
+                }
+
                 handleRoleRedirection(appUser);
                 return;
             }
 
-            // --- 3. EMAIL RECOVERY (For Pre-registered or Stranded accounts) ---
-            if (firebaseUser.email) {
-                const emailRecord = await getUserByEmail(firebaseUser.email);
-
-                // If they have an email record for exactly the role they want, migrate/link it.
-                if (emailRecord && (emailRecord as any).role === preferredRole) {
-                    const appUser = {
-                        ...firestoreDocToAppUser(emailRecord),
-                        id: uid, // Use new UID for context
-                        uid: uid,
-                        loginProvider: "google.com",
-                        hasPassword: firebaseUser.providerData.some(p => p.providerId === "password")
-                    };
-
-                    // MIGRATION: If the old record used a different ID (e.g. Register Number),
-                    // we CREATE a new document with UID and then potentially clean up the old one.
-                    // If IDs already match, updateUserDocument handles it.
-                    if (emailRecord.id !== uid) {
-                        await createUserDocument(uid, { ...emailRecord, uid: uid });
-                        // Note: We keep the old document for legacy dashboard consistency (Dual-sync)
-                    } else {
-                        await updateUserDocument(uid, { uid: uid });
-                    }
-
-                    setUser(appUser);
-                    handleRoleRedirection(appUser);
-                    return;
-                }
-            }
-
-            // --- 4. SKELETON or RECOVERY (No UID document found) ---
+            // --- 3. NEW USER (Skeleton Creation) ---
             const storedRole = localStorage.getItem("alsa_preferred_role") as Role;
             const activeRole = preferredRole || storedRole || null;
-
-            // Optional: Recovery check (only if we have a clear role intent)
-            if (activeRole) {
-                let recoveryData = await getUserByEmail(firebaseUser.email || "");
-                if (!recoveryData) {
-                    // Check stranded collections
-                    const stuSnap = await getDoc(doc(db, "students", uid));
-                    if (stuSnap.exists()) {
-                        recoveryData = { id: stuSnap.id, ...stuSnap.data(), role: "student" } as any;
-                    } else {
-                        const facSnap = await getDoc(doc(db, "faculty", uid));
-                        if (facSnap.exists()) {
-                            recoveryData = { id: facSnap.id, ...facSnap.data(), role: "faculty" } as any;
-                        }
-                    }
-                }
-
-                if (recoveryData && (recoveryData as any).role === activeRole) {
-                    const recoveredUser = {
-                        ...firestoreDocToAppUser(recoveryData),
-                        loginProvider: "google.com",
-                        hasPassword: firebaseUser.providerData.some(p => p.providerId === "password")
-                    };
-                    await createUserDocument(uid, recoveryData as any); // Migrate to users collection
-                    setUser(recoveredUser);
-                    toast.success("Account recovered successfully!");
-                    handleRoleRedirection(recoveredUser);
-                    return;
-                }
-            }
 
             const skeletonUser: AppUser = {
                 id: uid,
@@ -523,8 +538,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 console.error("Google login error:", error);
                 toast.error("Google Sign-In failed: " + error.message);
-
-                // Centralized issue logging
                 logSystemIssue({
                     errorType: "AUTH_ERROR",
                     errorMessage: `Google Login Failed: ${error.code} - ${error.message}`,
@@ -567,7 +580,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             // 2. Write to Firestore
-            let firestoreUpdates: Record<string, any> = { ...otherUpdates };
+            const firestoreUpdates: Record<string, any> = { ...otherUpdates };
 
             // Keep Firestore field names in sync
             if ("department" in otherUpdates && otherUpdates.department) {

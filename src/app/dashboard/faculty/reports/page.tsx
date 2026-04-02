@@ -139,7 +139,7 @@ export default function FacultyReportsPage() {
             studentDetails: allStudents.map(student => {
                 const pri = student.priScore || 0;
                 const priData = calculatePRI(student);
-                let tier = pri >= 75 ? "Ready" : pri >= 60 ? "Moderate" : pri >= 40 ? "High" : "Critical";
+                const tier = pri >= 75 ? "Ready" : pri >= 60 ? "Moderate" : pri >= 40 ? "High" : "Critical";
                 return {
                     name: student.name,
                     pri,
@@ -164,7 +164,7 @@ export default function FacultyReportsPage() {
     );
 
     if (!reportData) return (
-        <div className="flex flex-col items-center justify-center h-48 gap-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/40">
+        <div className="flex flex-col items-center justify-center h-48 gap-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800/40">
             <Activity className="h-10 w-10 text-slate-300" />
             <p className="text-slate-400 dark:text-slate-300 font-medium italic">No students registered in your department yet.</p>
         </div>
@@ -254,9 +254,21 @@ export default function FacultyReportsPage() {
                     <div className="p-4">
                         <ResponsiveContainer width="100%" height={280}>
                             <BarChart data={reportData.cgpaDistribution} margin={{ left: 0, right: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={11} fontWeight={700} tick={{ fill: "#64748b" }} />
-                                <YAxis axisLine={false} tickLine={false} fontSize={11} tick={{ fill: "#94a3b8" }} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#000000" strokeOpacity={0.2} vertical={false} />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tickLine={{ stroke: "#000000" }}
+                                    fontSize={11}
+                                    fontWeight={700}
+                                    tick={{ fill: "#000000" }}
+                                />
+                                <YAxis
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tickLine={{ stroke: "#000000" }}
+                                    fontSize={11}
+                                    tick={{ fill: "#000000" }}
+                                />
                                 <Tooltip content={<DarkTooltip />} cursor={{ fill: "rgba(59,130,246,0.06)", radius: 8 }} />
                                 <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} maxBarSize={50} />
                             </BarChart>

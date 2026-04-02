@@ -10,13 +10,6 @@ import { FileText, TrendingUp, PlusCircle } from "lucide-react";
 export default function AcademicRecordsPage() {
     const router = useRouter();
     const { user } = useAuth();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    if (!mounted) return null;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

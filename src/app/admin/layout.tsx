@@ -24,9 +24,9 @@ export default function AdminLayout({
             if (user.role === "student") {
                 router.push("/dashboard/student");
             } else if (user.role === "faculty") {
-                if (!user.approved) {
+                if (user.approved === false) {
                     router.push("/faculty/pending-approval");
-                } else {
+                } else if (user.approved === true) {
                     router.push("/dashboard/faculty");
                 }
             }

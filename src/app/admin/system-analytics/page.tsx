@@ -240,18 +240,18 @@ export default function AdminSystemAnalytics() {
                                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.1)" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
                                     <XAxis
                                         dataKey="week"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }}
+                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                        tickLine={{ stroke: "#000000" }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
                                         dy={10}
                                     />
                                     <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }}
+                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                        tickLine={{ stroke: "#000000" }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#0f172a', borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', padding: '16px', fontWeight: '900', textTransform: 'uppercase', fontSize: '10px', color: '#fff' }}
@@ -326,12 +326,12 @@ export default function AdminSystemAnalytics() {
                     <div className="h-[400px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={analytics.deptData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.1)" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
                                 <XAxis
                                     dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 9, fontWeight: 900, fill: '#64748b' }}
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tickLine={{ stroke: "#000000" }}
+                                    tick={{ fontSize: 9, fontWeight: 900, fill: "#000000" }}
                                     angle={-45}
                                     textAnchor="end"
                                 />

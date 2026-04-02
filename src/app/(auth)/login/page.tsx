@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,14 +19,7 @@ export default function LoginPage() {
     const [role, setRole] = useState<"student" | "faculty">("student");
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
-    const { login, user, googleLogin, isLoading, handleRoleRedirection } = useAuth(); // Use unified redirection
-    const router = useRouter();
-
-    useEffect(() => {
-        if (!isLoading && user) {
-            handleRoleRedirection(user);
-        }
-    }, [user, isLoading, handleRoleRedirection]);
+    const { login, googleLogin } = useAuth();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");

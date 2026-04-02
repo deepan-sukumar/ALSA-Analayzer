@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { VerificationTestModal } from "@/components/verification-test-modal";
 
 const CORE_SUBJECT_LABELS: Record<string, string> = {
     // Labels are now mostly identity or slightly cleaned
@@ -52,12 +53,35 @@ export default function OutcomeAlignmentPage() {
         advanced: string[];
     }>({ core: [], intermediate: [], advanced: [] });
 
+    // Modals
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
+    const [pendingTopics, setPendingTopics] = useState<CoreTopicSelection>({});
+    const [verifiedCoreTopics, setVerifiedCoreTopics] = useState<CoreTopicSelection>({});
+
+    // New: Role Verification State
+    const [verifiedRoleConcepts, setVerifiedRoleConcepts] = useState<{
+        core: string[];
+        intermediate: string[];
+        advanced: string[];
+    }>({ core: [], intermediate: [], advanced: [] });
+
+    // Track which section triggered the test
+    const [testMode, setTestMode] = useState<"core" | "role" | null>(null);
+
     // Load existing data
     useEffect(() => {
-        if (user && user.outcomeAlignment) {
+        if (!user) return;
+
+        if (user.verifiedCoreTopics) {
+            setVerifiedCoreTopics(user.verifiedCoreTopics);
+        }
+        if (user.verifiedRoleConcepts) {
+            setVerifiedRoleConcepts(user.verifiedRoleConcepts);
+        }
+
+        if (user.outcomeAlignment) {
             const oa = user.outcomeAlignment;
 
-            // Load Core Topics if available
             if (oa.coreTopics) {
                 setSelectedCoreTopics(prev => ({
                     ...prev,
@@ -110,7 +134,6 @@ export default function OutcomeAlignmentPage() {
         }));
     };
 
-    // Calculate Core Profile Dynamically
     const calculatedCoreProfile = useMemo(() => {
         const dept = user?.department || "CSE";
         const mandatorySubjects = getCoreSubjects(dept);
@@ -119,9 +142,10 @@ export default function OutcomeAlignmentPage() {
 
         mandatorySubjects.forEach(subject => {
             const allTopics = (CORE_ACADEMIC_TOPICS as any)[subject] || [];
-            const selected = (selectedCoreTopics as any)[subject] || [];
+            // Use verifiedCoreTopics so the UI reflects the real verified score
+            const verified = (verifiedCoreTopics as any)[subject] || [];
             const score = allTopics.length > 0
-                ? Math.round((selected.length / allTopics.length) * 100)
+                ? Math.round((verified.length / allTopics.length) * 100)
                 : 0;
 
             profile[subject] = score;
@@ -133,15 +157,105 @@ export default function OutcomeAlignmentPage() {
             ...profile,
             coreCoverage
         };
-    }, [selectedCoreTopics, user?.department]);
+    }, [verifiedCoreTopics, user?.department]);
 
 
-    const handleSave = async () => {
+    const handleSaveCore = () => {
+        // Find unverified new topics
+        const newUnverifiedTopics: CoreTopicSelection = {};
+        let hasNew = false;
+
+        Object.keys(selectedCoreTopics).forEach(domain => {
+            const selected = selectedCoreTopics[domain] || [];
+            const verified = verifiedCoreTopics[domain] || [];
+            const newlySelected = selected.filter(t => !verified.includes(t));
+            if (newlySelected.length > 0) {
+                newUnverifiedTopics[domain] = newlySelected;
+                hasNew = true;
+            }
+        });
+
+        if (hasNew) {
+            setPendingTopics(newUnverifiedTopics);
+            setTestMode("core");
+            setShowVerificationModal(true);
+        } else {
+            finalizeSave(verifiedCoreTopics, verifiedRoleConcepts);
+        }
+    };
+
+    const handleSaveRole = () => {
+        const newUnverifiedTopics: CoreTopicSelection = {};
+        let hasNew = false;
+
+        // Add Role Concepts
+        const newCore = conceptState.core.filter(c => !verifiedRoleConcepts.core.includes(c));
+        const newInter = conceptState.intermediate.filter(c => !verifiedRoleConcepts.intermediate.includes(c));
+        const newAdv = conceptState.advanced.filter(c => !verifiedRoleConcepts.advanced.includes(c));
+
+        if (newCore.length > 0 || newInter.length > 0 || newAdv.length > 0) {
+            hasNew = true;
+            if (newCore.length > 0) newUnverifiedTopics["Role Core"] = newCore;
+            if (newInter.length > 0) newUnverifiedTopics["Role Intermediate"] = newInter;
+            if (newAdv.length > 0) newUnverifiedTopics["Role Advanced"] = newAdv;
+        }
+
+        if (hasNew) {
+            setPendingTopics(newUnverifiedTopics);
+            setTestMode("role");
+            setShowVerificationModal(true);
+        } else {
+            finalizeSave(verifiedCoreTopics, verifiedRoleConcepts);
+        }
+    };
+
+    const handleVerificationComplete = async (newVerifiedTopics: CoreTopicSelection, score: number) => {
+        if (testMode === "core") {
+            const mergedVerifiedCore: CoreTopicSelection = { ...verifiedCoreTopics };
+            Object.keys(newVerifiedTopics).forEach(domain => {
+                if (!domain.startsWith("Role ")) {
+                    const existing = mergedVerifiedCore[domain] || [];
+                    mergedVerifiedCore[domain] = [...new Set([...existing, ...newVerifiedTopics[domain]])];
+                }
+            });
+            setVerifiedCoreTopics(mergedVerifiedCore);
+            await finalizeSave(mergedVerifiedCore, verifiedRoleConcepts, score);
+        } else if (testMode === "role") {
+            const mergedVerifiedRole = {
+                core: [...new Set([...verifiedRoleConcepts.core, ...(newVerifiedTopics["Role Core"] || [])])],
+                intermediate: [...new Set([...verifiedRoleConcepts.intermediate, ...(newVerifiedTopics["Role Intermediate"] || [])])],
+                advanced: [...new Set([...verifiedRoleConcepts.advanced, ...(newVerifiedTopics["Role Advanced"] || [])])]
+            };
+            setVerifiedRoleConcepts(mergedVerifiedRole);
+            await finalizeSave(verifiedCoreTopics, mergedVerifiedRole, score);
+        } else {
+            // Backup fallback just in case
+            await finalizeSave(verifiedCoreTopics, verifiedRoleConcepts, score);
+        }
+    };
+
+    const finalizeSave = async (latestVerifiedTopics: CoreTopicSelection, latestVerifiedRole: { core: string[], intermediate: string[], advanced: string[] }, testScore?: number) => {
         setLoading(true);
 
         try {
-            // 1. Prepare Data
-            const updatedCoreProfile = calculatedCoreProfile;
+            // Recalculate based on verified for saving
+            const dept = user?.department || "CSE";
+            const mandatorySubjects = getCoreSubjects(dept);
+            const profile: Record<string, number> = {};
+            let totalCoreScore = 0;
+
+            mandatorySubjects.forEach(subject => {
+                const allTopics = (CORE_ACADEMIC_TOPICS as any)[subject] || [];
+                const verified = (latestVerifiedTopics as any)[subject] || [];
+                const score = allTopics.length > 0
+                    ? Math.round((verified.length / allTopics.length) * 100)
+                    : 0;
+                profile[subject] = score;
+                totalCoreScore += score;
+            });
+
+            const coreCoverage = mandatorySubjects.length > 0 ? Math.round(totalCoreScore / mandatorySubjects.length) : 0;
+            const updatedCoreProfile = { ...profile, coreCoverage };
 
             const updatedRoleProfile: RoleTrackProfile = {
                 trackSelected: selectedTrack,
@@ -170,12 +284,14 @@ export default function OutcomeAlignmentPage() {
             const alignmentData: OutcomeAlignment = {
                 core: updatedCoreProfile,
                 role: updatedRoleProfile,
-                coreTopics: selectedCoreTopics, // Save topics!
+                coreTopics: selectedCoreTopics, // Save all selected
                 score: 0,
                 lastUpdated: new Date().toISOString()
             };
 
-            // 4. Calculate Final Score
+            // 4. Calculate Final Score (the updated academic-calculations will use the supplied verifiedCoreTopics if we pass it dynamically, or we rely on the DB hook. Let's just update the user profile first).
+            const mockUserForCalc = { ...user, verifiedCoreTopics: latestVerifiedTopics, outcomeAlignment: alignmentData };
+            // Note: calculateOutcomeAlignmentScore in original code relies on outcome alignment data.
             const finalScore = calculateOutcomeAlignmentScore(alignmentData);
             alignmentData.score = finalScore;
 
@@ -184,6 +300,10 @@ export default function OutcomeAlignmentPage() {
                 coreAcademicProfile: updatedCoreProfile,
                 roleTrackProfile: updatedRoleProfile,
                 coreAcademicTopics: selectedCoreTopics, // Explicit top-level save
+                verifiedCoreTopics: latestVerifiedTopics, // NEW FIELD
+                verifiedRoleConcepts: latestVerifiedRole, // NEW FIELD
+                ...(testScore !== undefined && { verificationScore: testScore }),
+                ...(testScore !== undefined && testScore < 5 && { failedVerifications: (user?.failedVerifications || 0) + 1 }),
                 outcomeAlignment: alignmentData,
                 // Explicitly sync scores for Faculty Portal visibility
                 priScore: finalScore,
@@ -213,12 +333,16 @@ export default function OutcomeAlignmentPage() {
         return getRolesForDepartment(user?.department || "CSE");
     }, [user?.department]);
 
-    // Quick role calc for display
+    // Quick role calc for display metrics using verified
     let currentRoleScore = 0;
     if (currentTrackMatrix) {
-        const corePct = currentTrackMatrix.core.length > 0 ? (conceptState.core.length / currentTrackMatrix.core.length) * 100 : 0;
-        const interPct = currentTrackMatrix.intermediate.length > 0 ? (conceptState.intermediate.length / currentTrackMatrix.intermediate.length) * 100 : 0;
-        const advPct = currentTrackMatrix.advanced.length > 0 ? (conceptState.advanced.length / currentTrackMatrix.advanced.length) * 100 : 0;
+        const calc = (current: string[], required: string[]) => {
+            const valid = current.filter(c => required.includes(c));
+            return required.length > 0 ? (valid.length / required.length) * 100 : 0;
+        };
+        const corePct = calc(verifiedRoleConcepts.core, currentTrackMatrix.core);
+        const interPct = calc(verifiedRoleConcepts.intermediate, currentTrackMatrix.intermediate);
+        const advPct = calc(verifiedRoleConcepts.advanced, currentTrackMatrix.advanced);
         currentRoleScore = (0.5 * corePct) + (0.3 * interPct) + (0.2 * advPct);
     }
 
@@ -288,9 +412,12 @@ export default function OutcomeAlignmentPage() {
                                         <div className="flex items-center gap-2">
                                             <Label className="font-black text-slate-800 dark:text-slate-200 text-lg cursor-pointer tracking-tight" htmlFor={`all-${subject}`}>{subject}</Label>
                                         </div>
-                                        <Badge className={cn("px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm", score >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : score >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700')}>
-                                            {score}% ({selectedCount}/{topics.length})
-                                        </Badge>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge className={cn("px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm", score >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : score >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700')}>
+                                                Verified: {score}%
+                                            </Badge>
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{selectedCount}/{topics.length} Selected</span>
+                                        </div>
                                     </div>
 
                                     <div className="relative z-10 flex items-center space-x-2 py-2 border-b-2 border-slate-100 dark:border-slate-800 mb-2 pb-3">
@@ -312,30 +439,43 @@ export default function OutcomeAlignmentPage() {
 
                                     <ScrollArea className="h-48 w-full pr-4 relative z-10">
                                         <div className="space-y-2.5">
-                                            {topics.map((topic: string) => (
-                                                <div key={topic} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                    <Checkbox
-                                                        id={`${subject}-${topic}`}
-                                                        checked={(selectedCoreTopics as any)[subject]?.includes(topic)}
-                                                        onCheckedChange={() => {
-                                                            setSelectedCoreTopics(prev => {
-                                                                const currentList = (prev as any)[subject] || [];
-                                                                const updatedList = currentList.includes(topic)
-                                                                    ? currentList.filter((t: string) => t !== topic)
-                                                                    : [...currentList, topic];
-                                                                return { ...prev, [subject]: updatedList };
-                                                            });
-                                                        }}
-                                                        className="mt-0.5 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 border-slate-300 dark:border-slate-600"
-                                                    />
-                                                    <Label
-                                                        htmlFor={`${subject}-${topic}`}
-                                                        className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-tight cursor-pointer flex-1"
-                                                    >
-                                                        {topic}
-                                                    </Label>
-                                                </div>
-                                            ))}
+                                            {topics.map((topic: string) => {
+                                                const isSelected = (selectedCoreTopics as any)[subject]?.includes(topic);
+                                                const isVerified = (verifiedCoreTopics as any)[subject]?.includes(topic);
+
+                                                return (
+                                                    <div key={topic} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                        <Checkbox
+                                                            id={`${subject}-${topic}`}
+                                                            checked={isSelected}
+                                                            onCheckedChange={() => {
+                                                                setSelectedCoreTopics(prev => {
+                                                                    const currentList = (prev as any)[subject] || [];
+                                                                    const updatedList = currentList.includes(topic)
+                                                                        ? currentList.filter((t: string) => t !== topic)
+                                                                        : [...currentList, topic];
+                                                                    return { ...prev, [subject]: updatedList };
+                                                                });
+                                                            }}
+                                                            className="mt-0.5 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 border-slate-300 dark:border-slate-600"
+                                                        />
+                                                        <div className="flex-1 flex items-center justify-between">
+                                                            <Label
+                                                                htmlFor={`${subject}-${topic}`}
+                                                                className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-tight cursor-pointer"
+                                                            >
+                                                                {topic}
+                                                            </Label>
+                                                            {isSelected && isVerified && (
+                                                                <Badge variant="outline" className="text-[9px] uppercase tracking-widest bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-800">Verified</Badge>
+                                                            )}
+                                                            {isSelected && !isVerified && (
+                                                                <Badge variant="outline" className="text-[9px] uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-800">Pending Test</Badge>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </ScrollArea>
                                 </div>
@@ -348,6 +488,27 @@ export default function OutcomeAlignmentPage() {
                             <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 drop-shadow-sm">{calculatedCoreProfile.coreCoverage}</span>
                             <span className="text-lg font-bold text-indigo-400 dark:text-indigo-600">%</span>
                         </div>
+                    </div>
+
+                    <div className="flex justify-end pt-8 relative z-10 border-t border-slate-100 dark:border-slate-800 mt-6 md:mt-8">
+                        <Button
+                            onClick={handleSaveCore}
+                            disabled={loading}
+                            className="relative overflow-hidden bg-indigo-600 hover:bg-indigo-700 text-white h-12 px-8 text-base font-black tracking-wide rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all duration-300 disabled:opacity-50 group hover:-translate-y-0.5"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:animate-shimmer" />
+                            {loading && testMode === "core" ? (
+                                <div className="flex items-center gap-2">
+                                    <Loader2 className="h-5 w-5 animate-spin text-indigo-200" />
+                                    <span>Updating Core...</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <Save className="h-4 w-4" />
+                                    <span>Commit Core Foundations</span>
+                                </div>
+                            )}
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -426,17 +587,31 @@ export default function OutcomeAlignmentPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {currentTrackMatrix.core.map(concept => (
-                                    <div key={concept} className={cn("flex items-center space-x-3 p-3.5 rounded-xl border-2 transition-all shadow-sm group/box", conceptState.core.includes(concept) ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700/50")}>
-                                        <Checkbox
-                                            id={`core-${concept}`}
-                                            checked={conceptState.core.includes(concept)}
-                                            onCheckedChange={() => toggleConcept("core", concept)}
-                                            className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 border-slate-300 dark:border-slate-600 drop-shadow-sm"
-                                        />
-                                        <Label htmlFor={`core-${concept}`} className={cn("cursor-pointer flex-1 font-bold text-sm leading-tight transition-colors", conceptState.core.includes(concept) ? "text-emerald-900 dark:text-emerald-100" : "text-slate-700 dark:text-slate-300 group-hover/box:text-slate-900 dark:group-hover/box:text-white")}>{concept}</Label>
-                                    </div>
-                                ))}
+                                {currentTrackMatrix.core.map(concept => {
+                                    const isSelected = conceptState.core.includes(concept);
+                                    const isVerified = verifiedRoleConcepts.core.includes(concept);
+                                    return (
+                                        <div key={concept} className={cn("flex items-start space-x-3 p-3.5 rounded-xl border-2 transition-all shadow-sm group/box", isSelected ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700/50")}>
+                                            <Checkbox
+                                                id={`core-${concept}`}
+                                                checked={isSelected}
+                                                onCheckedChange={() => toggleConcept("core", concept)}
+                                                className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 border-slate-300 dark:border-slate-600 drop-shadow-sm"
+                                            />
+                                            <div className="flex-1 flex flex-col gap-1.5">
+                                                <Label htmlFor={`core-${concept}`} className={cn("cursor-pointer font-bold text-sm transition-colors", isSelected ? "text-emerald-900 dark:text-emerald-100" : "text-slate-700 dark:text-slate-300 group-hover/box:text-slate-900 dark:group-hover/box:text-white")}>{concept}</Label>
+                                                <div className="flex w-full">
+                                                    {isSelected && isVerified && (
+                                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 uppercase tracking-widest bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-800 whitespace-nowrap">Verified</Badge>
+                                                    )}
+                                                    {isSelected && !isVerified && (
+                                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-800 whitespace-nowrap">Pending Test</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -463,17 +638,31 @@ export default function OutcomeAlignmentPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {currentTrackMatrix.intermediate.map(concept => (
-                                    <div key={concept} className={cn("flex items-center space-x-3 p-3.5 rounded-xl border-2 transition-all shadow-sm group/box", conceptState.intermediate.includes(concept) ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700/50")}>
-                                        <Checkbox
-                                            id={`inter-${concept}`}
-                                            checked={conceptState.intermediate.includes(concept)}
-                                            onCheckedChange={() => toggleConcept("intermediate", concept)}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-slate-300 dark:border-slate-600 drop-shadow-sm"
-                                        />
-                                        <Label htmlFor={`inter-${concept}`} className={cn("cursor-pointer flex-1 font-bold text-sm leading-tight transition-colors", conceptState.intermediate.includes(concept) ? "text-blue-900 dark:text-blue-100" : "text-slate-700 dark:text-slate-300 group-hover/box:text-slate-900 dark:group-hover/box:text-white")}>{concept}</Label>
-                                    </div>
-                                ))}
+                                {currentTrackMatrix.intermediate.map(concept => {
+                                    const isSelected = conceptState.intermediate.includes(concept);
+                                    const isVerified = verifiedRoleConcepts.intermediate.includes(concept);
+                                    return (
+                                        <div key={concept} className={cn("flex items-start space-x-3 p-3.5 rounded-xl border-2 transition-all shadow-sm group/box", isSelected ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700/50")}>
+                                            <Checkbox
+                                                id={`inter-${concept}`}
+                                                checked={isSelected}
+                                                onCheckedChange={() => toggleConcept("intermediate", concept)}
+                                                className="mt-0.5 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-slate-300 dark:border-slate-600 drop-shadow-sm"
+                                            />
+                                            <div className="flex-1 flex flex-col gap-1.5">
+                                                <Label htmlFor={`inter-${concept}`} className={cn("cursor-pointer font-bold text-sm transition-colors", isSelected ? "text-blue-900 dark:text-blue-100" : "text-slate-700 dark:text-slate-300 group-hover/box:text-slate-900 dark:group-hover/box:text-white")}>{concept}</Label>
+                                                <div className="flex w-full">
+                                                    {isSelected && isVerified && (
+                                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 uppercase tracking-widest bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:border-blue-800 whitespace-nowrap">Verified</Badge>
+                                                    )}
+                                                    {isSelected && !isVerified && (
+                                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-800 whitespace-nowrap">Pending Test</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -500,18 +689,52 @@ export default function OutcomeAlignmentPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {currentTrackMatrix.advanced.map(concept => (
-                                    <div key={concept} className={cn("flex items-center space-x-3 p-3.5 rounded-xl border-2 transition-all shadow-sm group/box", conceptState.advanced.includes(concept) ? "bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700/50")}>
-                                        <Checkbox
-                                            id={`adv-${concept}`}
-                                            checked={conceptState.advanced.includes(concept)}
-                                            onCheckedChange={() => toggleConcept("advanced", concept)}
-                                            className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 border-slate-300 dark:border-slate-600 drop-shadow-sm"
-                                        />
-                                        <Label htmlFor={`adv-${concept}`} className={cn("cursor-pointer flex-1 font-bold text-sm leading-tight transition-colors", conceptState.advanced.includes(concept) ? "text-purple-900 dark:text-purple-100" : "text-slate-700 dark:text-slate-300 group-hover/box:text-slate-900 dark:group-hover/box:text-white")}>{concept}</Label>
-                                    </div>
-                                ))}
+                                {currentTrackMatrix.advanced.map(concept => {
+                                    const isSelected = conceptState.advanced.includes(concept);
+                                    const isVerified = verifiedRoleConcepts.advanced.includes(concept);
+                                    return (
+                                        <div key={concept} className={cn("flex items-start space-x-3 p-3.5 rounded-xl border-2 transition-all shadow-sm group/box", isSelected ? "bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700/50")}>
+                                            <Checkbox
+                                                id={`adv-${concept}`}
+                                                checked={isSelected}
+                                                onCheckedChange={() => toggleConcept("advanced", concept)}
+                                                className="mt-0.5 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 border-slate-300 dark:border-slate-600 drop-shadow-sm"
+                                            />
+                                            <div className="flex-1 flex flex-col gap-1.5">
+                                                <Label htmlFor={`adv-${concept}`} className={cn("cursor-pointer font-bold text-sm transition-colors", isSelected ? "text-purple-900 dark:text-purple-100" : "text-slate-700 dark:text-slate-300 group-hover/box:text-slate-900 dark:group-hover/box:text-white")}>{concept}</Label>
+                                                <div className="flex w-full">
+                                                    {isSelected && isVerified && (
+                                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 uppercase tracking-widest bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-400 dark:border-purple-800 whitespace-nowrap">Verified</Badge>
+                                                    )}
+                                                    {isSelected && !isVerified && (
+                                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-800 whitespace-nowrap">Pending Test</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
+                        </div>
+                        <div className="flex justify-end pt-8 relative z-10 border-t border-slate-100 dark:border-slate-800 mt-6">
+                            <Button
+                                onClick={handleSaveRole}
+                                disabled={loading || !selectedTrack}
+                                className="relative overflow-hidden bg-indigo-600 hover:bg-indigo-700 text-white h-12 px-8 text-base font-black tracking-wide rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all duration-300 disabled:opacity-50 group hover:-translate-y-0.5"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:animate-shimmer" />
+                                {loading && testMode === "role" ? (
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="h-5 w-5 animate-spin text-indigo-200" />
+                                        <span>Updating Track...</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Save className="h-4 w-4" />
+                                        <span>Commit Outcome Alignment</span>
+                                    </div>
+                                )}
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -530,27 +753,13 @@ export default function OutcomeAlignmentPage() {
                 </div>
             )}
 
-            {/* 4. SAVE BUTTON */}
-            <div className="flex justify-end pt-8 relative z-10">
-                <Button
-                    onClick={handleSave}
-                    disabled={loading || !selectedTrack}
-                    className="relative overflow-hidden bg-indigo-600 hover:bg-indigo-700 text-white h-14 px-10 text-lg font-black tracking-wide rounded-xl shadow-xl hover:shadow-indigo-500/25 transition-all duration-300 disabled:opacity-50 group hover:-translate-y-1"
-                >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:animate-shimmer" />
-                    {loading ? (
-                        <div className="flex items-center gap-3">
-                            <Loader2 className="h-6 w-6 animate-spin text-indigo-200" />
-                            <span>Updating Alignment Protocol...</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-3">
-                            <Save className="h-5 w-5" />
-                            <span>Commit Developmental Path</span>
-                        </div>
-                    )}
-                </Button>
-            </div>
+            {/* 4. OLD COMBINED SAVE BUTTON (Removed) */}
+            <VerificationTestModal
+                isOpen={showVerificationModal}
+                onClose={() => setShowVerificationModal(false)}
+                selectedTopics={pendingTopics}
+                onVerificationComplete={handleVerificationComplete}
+            />
         </div>
     );
 }

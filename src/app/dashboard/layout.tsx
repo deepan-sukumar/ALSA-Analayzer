@@ -32,9 +32,9 @@ export default function DashboardLayout({
                     router.push("/dashboard/student");
                 }
             } else if (user.role === "faculty") {
-                if (!user.approved) {
+                if (user.approved === false) {
                     router.push("/faculty/pending-approval");
-                } else if (!pathname.startsWith("/dashboard/faculty") && !pathname.startsWith("/complete-profile")) {
+                } else if (user.approved === true && !pathname.startsWith("/dashboard/faculty") && !pathname.startsWith("/complete-profile")) {
                     router.push("/dashboard/faculty");
                 }
             } else if (user.role === "admin") {

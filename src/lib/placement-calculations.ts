@@ -49,7 +49,8 @@ export function calculateCoreFoundationScore(user: User): { score: number, cover
     if (!user) return { score: 0, coverage: 0 };
     const dept = user.department || "General";
     const mandatorySubjects = getCoreSubjects(dept);
-    const selectedTopics = user.coreAcademicTopics || {} as Record<string, string[]>;
+    // Score only relies on verified topics
+    const selectedTopics = user.verifiedCoreTopics || {} as Record<string, string[]>;
 
     if (!mandatorySubjects || mandatorySubjects.length === 0) return { score: 0, coverage: 0 };
 
@@ -84,16 +85,20 @@ export function calculateCoreFoundationScore(user: User): { score: number, cover
 // -------------------------------------------------------------
 export function calculateNewRoleScore(user: User): number {
     if (user.roleTrackProfile) {
-        const { concepts, trackSelected } = user.roleTrackProfile;
+        const { trackSelected } = user.roleTrackProfile;
+        const concepts = user.verifiedRoleConcepts || { core: [], intermediate: [], advanced: [] };
         const matrix = ROLE_SKILL_MATRIX[trackSelected as PlacementRole];
 
         if (!matrix) return 0;
 
-        const calc = (current: number, total: number) => total > 0 ? (current / total) * 100 : 0;
+        const calc = (current: string[], required: string[]) => {
+            const valid = current.filter(c => required.includes(c));
+            return required.length > 0 ? (valid.length / required.length) * 100 : 0;
+        };
 
-        const corePct = calc(concepts.core.length, matrix.core.length);
-        const interPct = calc(concepts.intermediate.length, matrix.intermediate.length);
-        const advPct = calc(concepts.advanced.length, matrix.advanced.length);
+        const corePct = calc(concepts.core, matrix.core);
+        const interPct = calc(concepts.intermediate, matrix.intermediate);
+        const advPct = calc(concepts.advanced, matrix.advanced);
 
         // Weighted: 50% Core, 30% Intermediate, 20% Advanced
         return Math.round((0.5 * corePct) + (0.3 * interPct) + (0.2 * advPct));
@@ -123,7 +128,7 @@ export function calculateNewRoleScore(user: User): number {
 // -------------------------------------------------------------
 
 export function calculateAptitudeScore(user: User): number {
-    const selectedTopics = user.coreAcademicTopics || {} as Record<string, string[]>;
+    const selectedTopics = user.verifiedCoreTopics || {} as Record<string, string[]>;
     const selectedAptitude = (selectedTopics as any)["Aptitude"] || (selectedTopics as any)["aptitude"];
     const totalAptitudeTopics = (CORE_ACADEMIC_TOPICS as any)["Aptitude"] || [];
 
@@ -205,7 +210,7 @@ export function determineTier(pri: number, arrears: number): "Ready" | "Moderate
 export function getMissingTopics(user: User) {
     const missing: Record<string, string[]> = {};
     const domains = Object.keys(CORE_ACADEMIC_TOPICS) as CoreDomain[];
-    const selected = user.coreAcademicTopics || {};
+    const selected = user.verifiedCoreTopics || {}; // treat unverified as missing
 
     domains.forEach(domain => {
         const all = CORE_ACADEMIC_TOPICS[domain];
@@ -279,7 +284,7 @@ function getTimeline(risk: string, missingCount: number): string {
 
 export function detectPerformanceGaps(user: User): PerformanceGap[] {
     const gaps: PerformanceGap[] = [];
-    const selectedTopics = user.coreAcademicTopics || {} as Record<string, string[]>;
+    const selectedTopics = user.verifiedCoreTopics || {} as Record<string, string[]>;
     const dept = user.department || "CSE";
     const mandatorySubjects = getCoreSubjects(dept);
 
@@ -605,7 +610,7 @@ export function generateActionPlan(
         improvements.push({ area: "Backlog Clearance", solution: `Clear ${standingArrears} standing arrears to unlock eligibility.`, priority: "Immediate" });
     }
 
-    const selectedCore = user.coreAcademicTopics || {} as Record<string, string[]>;
+    const selectedCore = user.verifiedCoreTopics || {} as Record<string, string[]>;
     const hasSubject = (sub: string) => {
         const topics = (selectedCore as any)[sub] || [];
         return topics.length > 0;
@@ -766,13 +771,52 @@ export function getPlacementReadiness(user: User): PlacementReadiness {
     const growthSuggestions = getGrowthSuggestions(performanceGaps);
     const unifiedRisk = calculateUnifiedRisk(user);
 
-    const eligibleFor = pri >= 80 ? ["Product Companies", "Premium Service"] :
-        pri >= 60 ? ["MNCs", "Service Based"] : ["Early Stage Startups"];
+    let eligibleFor: string[] = [];
+    let tierSuggestions: string[] = [];
+
+    if (tier === "Ready") { // PRI >= 75
+        eligibleFor = ["Product Based Companies", "Premium Service (MAANG/Equivalent)", "High-Growth Startups", "Core Tech Roles"];
+        tierSuggestions = [
+            "Your profile is elite. Focus primarily on System Design (HLD/LLD) and highly optimized Data Structures.",
+            "Target Product-Based Companies offering packages above 12+ LPA.",
+            "Prepare for rigorous machine coding and architectural rounds."
+        ];
+    } else if (tier === "Moderate") { // PRI >= 60
+        eligibleFor = ["MNCs & Consulting", "High-Tier Service Companies", "Mid-Level Startups", "System Integrators"];
+        tierSuggestions = [
+            "You have a solid foundation. You are highly eligible for standard Day-1 MNCs and Service-Based roles.",
+            "To break into Product-Based companies, you need to drastically boost your Core Tech coverage and DSA solving speed.",
+            "Focus on clearing aptitude and standard coding rounds flawlessly."
+        ];
+    } else if (tier === "High") { // PRI >= 40
+        eligibleFor = ["Mid-Tier IT Services", "BPO Tech Support", "Internship-to-FTE Trainee Roles"];
+        tierSuggestions = [
+            "Your profile is missing key foundational elements. Avoid applying to premium roles until your gaps are closed.",
+            "Target smaller IT firms or look for 6-month train-and-hire internships.",
+            "Prioritize clearing backlogs immediately and building at least one solid portfolio project."
+        ];
+    } else { // Critical
+        eligibleFor = ["Apprenticeship Programs", "Mass Recruiters (Conditional)", "Local Startups (Entry-Level)"];
+        tierSuggestions = [
+            "Your readiness is critically low. Focus exclusively on academic recovery first.",
+            "Do not focus on advanced tech; prioritize passing grades, aptitude basics, and basic communication.",
+            "Target mass recruiters or off-campus entry-level roles once academic blockers are cleared."
+        ];
+    }
 
     const finalRisk = {
         label: tier as any,
         index: Math.round(100 - pri)
     };
+
+    const keyStrengths: string[] = [];
+    if (breakDown.academicNormalized >= 75) keyStrengths.push("Strong Academic Track Record");
+    if (breakDown.coreNormalized >= 70) keyStrengths.push("Solid Core Subject Knowledge");
+    if (breakDown.roleNormalized >= 60) keyStrengths.push("Strong Role Skill Alignment");
+    if (breakDown.aptitudeNormalized >= 70) keyStrengths.push("High Aptitude Readiness");
+    if (breakDown.enrichmentNormalized >= 50) keyStrengths.push("Active Co-Curricular Profile");
+    if (standingArrears === 0) keyStrengths.push("Clear Placement Eligibility (No Backlogs)");
+    if (keyStrengths.length === 0) keyStrengths.push("Currently in Foundation Building Phase");
 
     return {
         pri,
@@ -792,13 +836,14 @@ export function getPlacementReadiness(user: User): PlacementReadiness {
 
         gaps: [],
         eligibleFor,
+        tierSuggestions,
         notEligibleFor: [],
         missingTopics,
 
         strategy: {
             holisticView: (tier === "Critical" || tier === "High") ? "Immediate intervention required." : "Progression is steady.",
             roadmapStep: "Development Plan",
-            keyStrengths: [],
+            keyStrengths,
             improvements
         },
 

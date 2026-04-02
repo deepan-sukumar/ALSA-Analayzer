@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -14,7 +14,7 @@ import {
     Activity, Award, BookOpen, Briefcase, Medal, Trophy,
     Sparkles, TrendingUp, Zap, Target, AlertTriangle, GraduationCap,
     Lightbulb, UserCheck, Flame, ChevronRight, CheckCircle2, Clock, Calendar,
-    ShieldCheck, ArrowUpRight
+    ShieldCheck, ArrowUpRight, Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { calculatePRI, getPlacementReadiness } from "@/lib/placement-calculations";
@@ -24,6 +24,37 @@ import Link from "next/link";
 
 export default function StudentDashboard() {
     const { user } = useAuth();
+
+    // AI Recommendations State
+    const [aiDrawbacks, setAiDrawbacks] = useState<any[]>([]);
+    const [aiRoadmap, setAiRoadmap] = useState<any[]>([]);
+    const [aiLoading, setAiLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        const fetchAI = async () => {
+            setAiLoading(true);
+            try {
+                const res = await fetch('/api/ai-recommendations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student: user })
+                });
+                if (res.ok && !cancelled) {
+                    const data = await res.json();
+                    setAiDrawbacks(data.drawbacks || []);
+                    setAiRoadmap(data.roadmap || []);
+                }
+            } catch (err) {
+                console.error('AI fetch failed', err);
+            } finally {
+                if (!cancelled) setAiLoading(false);
+            }
+        };
+        fetchAI();
+        return () => { cancelled = true; };
+    }, [user]);
 
     // --- PRI Calculations ---
     const priData = useMemo(() => {
@@ -240,8 +271,8 @@ export default function StudentDashboard() {
                                 <div className="h-[220px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RadarChart cx="50%" cy="50%" outerRadius="68%" data={radarData}>
-                                            <PolarGrid stroke="currentColor" className="text-slate-200 dark:text-slate-700/50" />
-                                            <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: 'currentColor', fontWeight: 700 }} className="text-slate-500 dark:text-slate-300" />
+                                            <PolarGrid stroke="#000000" strokeOpacity={0.2} />
+                                            <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "#000000", fontWeight: 700 }} />
                                             <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                                             <Radar
                                                 name="Readiness"
@@ -332,7 +363,7 @@ export default function StudentDashboard() {
                                     <div className="h-[200px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={barData} layout="vertical">
-                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
+                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#000000" strokeOpacity={0.2} />
                                                 <XAxis type="number" hide />
                                                 <YAxis type="category" dataKey="name" hide />
                                                 <RechartsTooltip contentStyle={{ background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} />
@@ -366,9 +397,20 @@ export default function StudentDashboard() {
                                     <div className="h-[200px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <LineChart data={growthData}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'currentColor', fontWeight: 600 }} className="text-slate-400 dark:text-slate-500" dy={10} />
-                                                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'currentColor', fontWeight: 600 }} className="text-slate-400 dark:text-slate-500" />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                                <XAxis
+                                                    dataKey="name"
+                                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                                    tickLine={{ stroke: "#000000" }}
+                                                    tick={{ fontSize: 12, fill: "#000000", fontWeight: 600 }}
+                                                    dy={10}
+                                                />
+                                                <YAxis
+                                                    domain={[0, 100]}
+                                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                                    tickLine={{ stroke: "#000000" }}
+                                                    tick={{ fontSize: 12, fill: "#000000", fontWeight: 600 }}
+                                                />
                                                 <RechartsTooltip
                                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))' }}
                                                 />
@@ -501,7 +543,7 @@ export default function StudentDashboard() {
                                                 <Lightbulb className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">AI Engine</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Intelligence Engine</p>
                                                 <p className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">Critical Priority</p>
                                             </div>
                                         </div>
@@ -523,8 +565,13 @@ export default function StudentDashboard() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    {readiness?.smartRoadmap && readiness.smartRoadmap.length > 0 ? (
-                                        readiness.smartRoadmap.slice(0, 6).map((week: any, idx: number) => {
+                                    {aiLoading ? (
+                                        <div className="flex flex-col items-center justify-center py-8 gap-3">
+                                            <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                                            <p className="text-xs font-medium text-slate-500">Generating strategic roadmap...</p>
+                                        </div>
+                                    ) : aiRoadmap.length > 0 ? (
+                                        aiRoadmap.slice(0, 6).map((week: any, idx: number) => {
                                             const colors = ["blue", "emerald", "purple", "blue", "emerald", "purple"];
                                             const icons = [Clock, Calendar, Target, Clock, Calendar, CheckCircle2];
                                             const Ic = icons[idx % 6];
@@ -541,11 +588,9 @@ export default function StudentDashboard() {
                                             );
                                         })
                                     ) : (
-                                        <>
-                                            <PlanCard time="Week 1-2" desc="Advanced" title="Elite Growth Phase" steps={["Practice system design patterns", "Attempt product-level mock interviews", "Contribute to open-source"]} icon={Clock} color="blue" />
-                                            <PlanCard time="Week 3-4" desc="Advanced" title="Portfolio & Depth" steps={["Build 1 showcase project", "Target national-level hackathon", "Earn advanced certification"]} icon={Calendar} color="emerald" />
-                                            <PlanCard time="Week 5-6" desc="Advanced" title="Interview Ready" steps={["Complete 200+ DSA problems", "Mock interview intensive", "Resume & LinkedIn optimization"]} icon={CheckCircle2} color="purple" />
-                                        </>
+                                        <div className="text-center py-6 text-sm text-slate-500 italic border rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                            No roadmap needed! Your profile is strong.
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -561,45 +606,38 @@ export default function StudentDashboard() {
                             <h2 className="text-2xl font-black italic tracking-tighter uppercase text-foreground">Performance Gaps & Development Priorities</h2>
                         </div>
 
-                        {readiness?.performanceGaps && readiness.performanceGaps.length > 0 ? (
+                        {aiLoading ? (
+                            <div className="flex flex-col items-center justify-center py-12 gap-3 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                                <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+                                <p className="text-sm font-medium text-slate-500">Analyzing your profile data for gaps...</p>
+                            </div>
+                        ) : aiDrawbacks.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {readiness.performanceGaps.map((gap: any, idx: number) => {
-                                    const riskColor = gap.riskLevel === "High" ? "red" : gap.riskLevel === "Moderate" ? "orange" : "yellow";
-                                    const riskBg = riskColor === "red" ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/50 hover:border-red-300 dark:hover:border-red-800/80" : riskColor === "orange" ? "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/50 hover:border-orange-300 dark:hover:border-orange-800/80" : "bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-900/50 hover:border-yellow-300 dark:hover:border-yellow-800/80";
-                                    const riskText = riskColor === "red" ? "text-red-700 dark:text-red-400" : riskColor === "orange" ? "text-orange-700 dark:text-orange-400" : "text-yellow-700 dark:text-yellow-400";
-                                    const riskBadge = riskColor === "red" ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-300 border-red-200 dark:border-red-800" : riskColor === "orange" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/60 dark:text-orange-300 border-orange-200 dark:border-orange-800" : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/60 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800";
-
+                                {aiDrawbacks.map((item: any, idx: number) => {
                                     return (
-                                        <div key={idx} className={cn("p-5 rounded-2xl border-2 space-y-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden group/gap", riskBg)}>
+                                        <div key={idx} className="p-5 rounded-2xl border-2 space-y-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden group/gap bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 hover:border-amber-300 dark:hover:border-amber-800/80">
                                             <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 opacity-0 group-hover/gap:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                                            <div className="flex items-center justify-between relative z-10">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className={cn("p-1.5 rounded-lg border bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm", riskColor === "red" ? "border-red-200" : riskColor === "orange" ? "border-orange-200" : "border-yellow-200")}>
-                                                        <AlertTriangle className={cn("h-4 w-4", riskText)} />
-                                                    </div>
-                                                    <span className={cn("font-black tracking-tight text-base", riskText)}>{gap.domain}</span>
+                                            <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400 dark:bg-amber-600 opacity-80" />
+
+                                            {/* Fault / Weakness */}
+                                            <div className="flex items-start gap-3 relative z-10 pb-3 border-b border-amber-200/50 dark:border-amber-800/50">
+                                                <div className="p-2.5 rounded-xl border bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border-rose-200 dark:border-rose-900/50 shrink-0">
+                                                    <AlertTriangle className="h-5 w-5 text-rose-500" />
                                                 </div>
-                                                <span className={cn("text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border shadow-sm", riskBadge)}>
-                                                    {gap.riskLevel} Risk • {gap.coverage}%
-                                                </span>
+                                                <div className="mt-0.5">
+                                                    <span className="font-black text-[10px] uppercase tracking-widest text-rose-600 dark:text-rose-400">Fault / Weakness</span>
+                                                    <p className="font-bold text-[15px] text-slate-800 dark:text-white leading-tight mt-1">{item.drawback}</p>
+                                                </div>
                                             </div>
-                                            <div className="space-y-3 relative z-10 bg-white/40 dark:bg-slate-900/40 p-3 rounded-xl backdrop-blur-sm border border-black/5 dark:border-white/5">
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-0.5 w-14 shrink-0">Problem</span>
-                                                    <p className="text-sm text-slate-800 dark:text-white font-bold leading-tight">{gap.problem}</p>
+
+                                            {/* Correction / Fix */}
+                                            <div className="flex items-start gap-3 relative z-10 pt-1">
+                                                <div className="p-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0 mt-1">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" />
                                                 </div>
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest mt-0.5 w-14 shrink-0">Impact</span>
-                                                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">{gap.impact}</p>
-                                                </div>
-                                                <div className="w-full h-px bg-black/5 dark:bg-white/5 my-1" />
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-0.5 w-14 shrink-0">Action</span>
-                                                    <p className="text-xs text-slate-600 dark:text-slate-300 font-bold">{gap.actionPlan?.[0] || "Focus on this area immediately."}</p>
-                                                </div>
-                                                <div className="flex items-start gap-3">
-                                                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5 w-14 shrink-0">Timeline</span>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium bg-white/60 dark:bg-slate-800/60 px-2 py-0.5 rounded border border-black/5 dark:border-white/5 inline-block">{gap.timeline}</p>
+                                                <div>
+                                                    <span className="font-black text-[10px] uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Correction / Idea to Improve</span>
+                                                    <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed mt-1">{item.suggestion}</p>
                                                 </div>
                                             </div>
                                         </div>

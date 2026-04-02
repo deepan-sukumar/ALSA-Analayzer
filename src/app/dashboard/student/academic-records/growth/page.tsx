@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from "recharts";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 
 export default function GrowthAnalyticsPage() {
     const { user } = useAuth();
@@ -38,21 +38,19 @@ export default function GrowthAnalyticsPage() {
                     <CardContent className="h-[350px] p-6">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={growthData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
                                 <XAxis
                                     dataKey="semester"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }}
-                                    className="text-slate-400 dark:text-slate-500"
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tickLine={{ stroke: "#000000" }}
+                                    tick={{ fill: "#000000", fontSize: 12, fontWeight: 600 }}
                                     dy={10}
                                 />
                                 <YAxis
                                     domain={[0, 10]}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }}
-                                    className="text-slate-400 dark:text-slate-500"
+                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                    tickLine={{ stroke: "#000000" }}
+                                    tick={{ fill: "#000000", fontSize: 12, fontWeight: 600 }}
                                 />
                                 <Tooltip
                                     contentStyle={{

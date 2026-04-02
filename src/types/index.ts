@@ -65,6 +65,20 @@ export interface OutcomeAlignment {
 
     score: number; // Final OA Score
     lastUpdated?: string;
+
+    // New: Topic Verification System
+    verifiedCoreTopics?: Record<string, string[]>; // only topics that passed the test
+    verifiedRoleConcepts?: {
+        core: string[];
+        intermediate: string[];
+        advanced: string[];
+    };
+    topicVerifications?: Record<string, {
+        status: "verified" | "unverified";
+        score: number;
+        attempts: number;
+        lastAttempt?: string;
+    }>;
 }
 
 
@@ -145,6 +159,7 @@ export interface PlacementReadiness {
 
     gaps: Gap[];
     eligibleFor: string[];
+    tierSuggestions?: string[];
     notEligibleFor: string[];
     missingTopics?: Record<string, string[]>;
 
@@ -236,7 +251,17 @@ export interface User {
     // Explicit Profiles (Saved as top-level fields)
     coreAcademicProfile?: CoreAcademicProfile;
     roleTrackProfile?: RoleTrackProfile;
-    coreAcademicTopics?: CoreTopicSelection;
+    coreAcademicTopics?: CoreTopicSelection; // selected topics
+
+    // New: Topic Verification System
+    verifiedCoreTopics?: CoreTopicSelection; // only topics that passed the test
+    verifiedRoleConcepts?: {
+        core: string[];
+        intermediate: string[];
+        advanced: string[];
+    };
+    verificationScore?: number; // Latest / Average test score
+    failedVerifications?: number; // Count of failed tests
 
     // Final Calculation
     academicOutcomeIndex?: AcademicOutcomeIndex;

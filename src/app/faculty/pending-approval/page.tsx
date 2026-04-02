@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { updateUserDocument } from "@/lib/firestore";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function PendingApprovalPage() {
     const { user, logout, isLoading } = useAuth();
@@ -31,18 +33,52 @@ export default function PendingApprovalPage() {
     useEffect(() => {
         if (!isLoading) {
             if (!user) {
-                router.push("/login");
+                router.replace("/login");
             } else if (!user.role) {
-                router.push("/select-role");
+                router.replace("/select-role");
             } else if (user.role === "faculty" && user.approved) {
-                router.push("/dashboard/faculty");
+                router.replace("/dashboard/faculty");
             } else if (user.role === "student") {
-                router.push("/dashboard/student");
+                router.replace("/dashboard/student");
             } else if (user.role === "admin") {
-                router.push("/admin/dashboard");
+                router.replace("/admin/dashboard");
             }
         }
     }, [user, isLoading, router]);
+
+    // Real-time listener for admin approval from both identity sources.
+    useEffect(() => {
+        if (!user?.id || user.approved) return;
+
+        let hasRedirected = false;
+        const redirectIfApproved = () => {
+            if (hasRedirected) return;
+            hasRedirected = true;
+            toast.success("Account approved! Redirecting to dashboard...");
+            router.replace("/dashboard/faculty");
+        };
+
+        const unsubscribeUsers = onSnapshot(doc(db, "users", user.id), (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data();
+            if (data.approved === true) {
+                redirectIfApproved();
+            }
+        });
+
+        const unsubscribeFaculty = onSnapshot(doc(db, "faculty", user.id), (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data();
+            if (data.approved === true) {
+                redirectIfApproved();
+            }
+        });
+
+        return () => {
+            unsubscribeUsers();
+            unsubscribeFaculty();
+        };
+    }, [user?.id, user?.approved, router]);
 
     if (isLoading || !user) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>;

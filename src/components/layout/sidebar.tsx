@@ -21,6 +21,7 @@ import {
     Target,
     Trophy,
     AlertCircle,
+    ShieldAlert,
 } from "lucide-react";
 import { Role } from "@/types";
 
@@ -74,6 +75,11 @@ export function Sidebar({ className, role: propRole }: SidebarProps) {
             title: "Risk Monitoring Center",
             href: "/dashboard/faculty/risk-monitor",
             icon: TrendingUp,
+        },
+        {
+            title: "Performance Integrity",
+            href: "/dashboard/faculty/integrity-hub",
+            icon: ShieldAlert,
         },
         {
             title: "Academic Reports",
