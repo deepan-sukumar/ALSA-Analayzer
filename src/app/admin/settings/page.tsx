@@ -120,7 +120,7 @@ export default function AdminSettings() {
     const currentTotalWeight = Object.values(config.priWeights).reduce((a, b) => Number(a) + Number(b), 0);
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700 pb-12">
+        <div className="space-y-6 animate-in fade-in duration-700 pb-12">
             {/* Premium Global Parameter Hero */}
             <div className="relative rounded-[48px] overflow-hidden bg-slate-950 border border-white/5 shadow-3xl group">
                 {/* Visual Background Elements */}
@@ -128,7 +128,7 @@ export default function AdminSettings() {
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay" />
 
                 <div className="relative z-10 p-12 md:p-16 flex flex-col lg:flex-row justify-between items-center gap-12">
-                    <div className="max-w-3xl space-y-8">
+                    <div className="max-w-3xl space-y-6">
                         <div className="inline-flex items-center gap-3 px-4 py-2 bg-indigo-500/10 rounded-full border border-indigo-500/20 backdrop-blur-md">
                             <Settings2 className="h-3.5 w-3.5 text-indigo-400" />
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300">Global Configuration Protocol</span>
@@ -244,7 +244,7 @@ export default function AdminSettings() {
                     </CardContent>
                 </Card>
 
-                <div className="space-y-8">
+                <div className="space-y-6">
                     {/* Risk Boundaries */}
                     <Card className="border-slate-200 dark:border-slate-800 shadow-xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-md overflow-hidden">
                         <CardHeader className="border-b border-slate-100 dark:border-slate-800/60 p-6 flex flex-row items-center gap-4">
@@ -355,3 +355,4 @@ export default function AdminSettings() {
         </div>
     );
 }
+

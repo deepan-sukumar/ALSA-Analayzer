@@ -52,6 +52,7 @@ const DEFAULT_LEGACY_TOPIC_GROUPS: TopicGroup[] = [
 const ALLOWED_TOPIC_MAP = new Map<string, Set<string>>(
     DEFAULT_LEGACY_TOPIC_GROUPS.map((group) => [group.title.toLowerCase(), new Set(group.topics.map((t) => t.toLowerCase()))])
 );
+const MAX_FAILED_ATTEMPTS = 3;
 
 const CORE_TOPIC_TO_DOMAIN = Object.entries(CORE_ACADEMIC_TOPICS).reduce<Record<string, string>>((acc, [domain, topics]) => {
     (topics as readonly string[]).forEach((topic) => {
@@ -260,9 +261,10 @@ export function FacultyIntegrityHub() {
             const requestRef = doc(db, "testAccessControl", requestId);
             await updateDoc(requestRef, {
                 status: "allowed",
-                failedAttempts: 1,
+                failedAttempts: MAX_FAILED_ATTEMPTS - 1,
                 approvedAt: serverTimestamp(),
-                approvedBy: user?.name
+                approvedBy: user?.name,
+                unlockReason: ""
             });
             toast.success("Request approved!");
         } catch {
@@ -315,7 +317,7 @@ export function FacultyIntegrityHub() {
     }, [selectedLog]);
 
     if (loading) return (
-        <Card className="h-[600px] flex items-center justify-center border-dashed">
+        <Card className="h-[420px] flex items-center justify-center border-dashed">
             <div className="flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
                 <p className="text-xs font-bold text-slate-400">Loading Integrity Stream...</p>
@@ -324,7 +326,7 @@ export function FacultyIntegrityHub() {
     );
 
     return (
-        <Card className="border-0 shadow-2xl bg-white dark:bg-slate-900 overflow-hidden flex flex-col h-[650px] border-l-4 border-l-indigo-600">
+        <Card className="border-0 shadow-2xl bg-white dark:bg-slate-900 overflow-hidden flex flex-col h-[560px] border-l-4 border-l-indigo-600">
             <CardHeader className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl">
@@ -407,7 +409,7 @@ export function FacultyIntegrityHub() {
                                     <p className="text-[10px] text-slate-400 italic">Note: Data will appear instantly after the index is active.</p>
                                 </div>
                             ) : logs.length === 0 ? (
-                                <div className="text-center py-20 flex flex-col items-center gap-3">
+                                <div className="text-center py-12 flex flex-col items-center gap-3">
                                     <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                         <History className="h-6 w-6 text-slate-300" />
                                     </div>
@@ -464,7 +466,7 @@ export function FacultyIntegrityHub() {
                     <ScrollArea className="h-full">
                         <div className="p-4 space-y-3">
                             {requests.length === 0 ? (
-                                <div className="text-center py-20 flex flex-col items-center gap-3">
+                                <div className="text-center py-12 flex flex-col items-center gap-3">
                                     <div className="h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center">
                                         <CheckCircle2 className="h-6 w-6 text-emerald-300" />
                                     </div>
@@ -485,6 +487,12 @@ export function FacultyIntegrityHub() {
                                             <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Requested Topics:</p>
                                             <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300 truncate">{req.topicsKey || "Selected Core Topics"}</p>
                                         </div>
+                                        {req.unlockReason && (
+                                            <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Student Reason:</p>
+                                                <p className="text-[10px] font-medium text-slate-700 dark:text-slate-200 leading-relaxed">{req.unlockReason}</p>
+                                            </div>
+                                        )}
                                         <div className="flex gap-2 pt-1">
                                             <Button size="sm" onClick={() => handleApprove(req.id)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 h-7 text-[10px] font-black transition-all shadow-md">Approve</Button>
                                             <Button size="sm" variant="ghost" onClick={() => handleReject(req.id)} className="border border-rose-200 text-rose-600 hover:bg-rose-50 h-7 text-[10px] font-black">Reject</Button>

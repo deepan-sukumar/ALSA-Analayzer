@@ -26,7 +26,7 @@ export default function FacultyProfilePage() {
     ];
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 px-1">
+        <div className="space-y-6 animate-in fade-in duration-500 px-1">
 
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 shadow-xl p-7">
@@ -72,11 +72,11 @@ export default function FacultyProfilePage() {
                         <div className="mt-6 w-full grid grid-cols-2 gap-3">
                             <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 text-center">
                                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-400 dark:text-indigo-300 mb-0.5">Portal</p>
-                                <p className="text-sm font-black text-indigo-700 dark:text-indigo-400 dark:text-indigo-300">Faculty</p>
+                                <p className="text-sm font-black text-indigo-700 dark:text-indigo-300">Faculty</p>
                             </div>
                             <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-900/50 text-center">
                                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-violet-400 dark:text-violet-300 mb-0.5">Access</p>
-                                <p className="text-sm font-black text-violet-700 dark:text-violet-400 dark:text-violet-300">{isApproved ? "Full" : "Limited"}</p>
+                                <p className="text-sm font-black text-violet-700 dark:text-violet-300">{isApproved ? "Full" : "Limited"}</p>
                             </div>
                         </div>
                     </div>
@@ -87,7 +87,7 @@ export default function FacultyProfilePage() {
 
                     {/* Account Info */}
                     <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-lg overflow-hidden border-0">
-                        <div className="px-6 py-5 border-b bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/60 flex items-center gap-3">
+                        <div className="px-6 py-5 border-b bg-slate-50 dark:bg-slate-800/60 flex items-center gap-3">
                             <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/50">
                                 <User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                             </div>
@@ -159,3 +159,4 @@ export default function FacultyProfilePage() {
         </div>
     );
 }
+

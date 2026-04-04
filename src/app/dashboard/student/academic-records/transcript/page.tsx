@@ -1,14 +1,16 @@
 "use client";
 
 import { useAuth } from "@/context/auth-context";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function TranscriptPage() {
     const { user } = useAuth();
+    const router = useRouter();
 
     const getGradeColor = (grade: string) => {
         switch (grade) {
@@ -42,16 +44,24 @@ export default function TranscriptPage() {
     const sortedSemesters = [...user.academicRecords].sort((a, b) => a.semester - b.semester);
 
     return (
-        <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-10">
+        <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-10">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 shadow-xl p-7 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
                 <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/50 mb-1">Student Intelligence Portal</p>
-                        <h1 className="text-3xl font-black mb-2 tracking-tight">Academic Transcript 📜</h1>
-                        <p className="text-white/60 font-medium text-sm">Official record of your semester-wise performance.</p>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => router.back()} 
+                            className="text-white/80 hover:text-white hover:bg-white/10 mb-2 -ml-2"
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                        </Button>
+                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/80 mb-1">Student Intelligence Portal</p>
+                        <h1 className="text-3xl font-black mb-2 tracking-tight leading-[1.15] pb-1">Academic Transcript 📜</h1>
+                        <p className="text-white/85 font-medium text-sm">Official record of your semester-wise performance.</p>
                     </div>
                     <Button variant="outline" className="bg-white/10 hover:bg-white/20 border-white/20 text-white font-black uppercase tracking-widest backdrop-blur-md shadow-2xl gap-2">
                         <Download className="h-4 w-4" /> Export PDF
@@ -59,7 +69,7 @@ export default function TranscriptPage() {
                 </div>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-6">
                 {sortedSemesters.map((sem) => (
                     <Card key={sem.semester} className="break-inside-avoid shadow-md border-t-4 border-t-primary/20">
                         <CardHeader className="bg-muted/30 pb-4">
@@ -82,3 +92,6 @@ export default function TranscriptPage() {
         </div>
     );
 }
+
+
+

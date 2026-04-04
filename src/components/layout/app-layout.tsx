@@ -14,16 +14,14 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children, user }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <div className="hidden border-r bg-muted/40 md:block md:w-64 lg:w-72">
-        <div className="sticky top-0 h-screen">
-          <Sidebar role={user?.role} />
-        </div>
+      <div className="hidden md:block">
+        <Sidebar role={user?.role} />
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col md:ml-[68px]">
         <Header />
         <main className="flex-1 space-y-4 p-8 pt-6">
           <AutoErrorWrapper user={user}>

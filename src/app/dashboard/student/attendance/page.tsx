@@ -35,16 +35,16 @@ export default function StudentAttendancePage() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-in fade-in duration-500">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-cyan-600 via-teal-600 to-emerald-700 shadow-xl p-7 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
                 <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/50 mb-1">Student Intelligence Portal</p>
-                        <h1 className="text-3xl font-black mb-2 tracking-tight">Attendance Tracking 📅</h1>
-                        <p className="text-white/60 font-medium text-sm">Monitor your subject-wise presence and attendance consistency.</p>
+                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/80 mb-1">Student Intelligence Portal</p>
+                        <h1 className="text-3xl font-black mb-2 tracking-tight leading-[1.15] pb-1">Attendance Tracking 📅</h1>
+                        <p className="text-white/85 font-medium text-sm">Monitor your subject-wise presence and attendance consistency.</p>
                     </div>
                     <Popover>
                         <PopoverTrigger asChild>
@@ -129,3 +129,6 @@ export default function StudentAttendancePage() {
         </div>
     );
 }
+
+
+

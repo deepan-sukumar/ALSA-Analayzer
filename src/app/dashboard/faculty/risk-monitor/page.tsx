@@ -112,7 +112,7 @@ export default function RiskMonitorPage() {
         pri < 40 ? "text-red-600" : pri < 60 ? "text-orange-500" : "text-blue-600";
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 px-1">
+        <div className="space-y-6 animate-in fade-in duration-500 px-1">
 
             {/* ── Page Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-red-600 via-rose-600 to-orange-600 shadow-xl p-7">
@@ -181,7 +181,7 @@ export default function RiskMonitorPage() {
             {/* ── Student Table ── */}
             <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xl border-0 overflow-hidden">
                 {/* Table Header / Search */}
-                <div className="px-6 py-4 border-b bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/60 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="px-6 py-4 border-b bg-slate-50 dark:bg-slate-800/60 flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-900/50">
                             <Activity className="h-4 w-4 text-rose-600 dark:text-rose-400" />
@@ -240,11 +240,11 @@ export default function RiskMonitorPage() {
                                             >
                                                 <TableCell className="pl-6 h-16">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-xs font-black text-slate-600 dark:text-slate-300 dark:text-slate-200 shrink-0">
+                                                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-xs font-black text-slate-600 dark:text-slate-200 shrink-0">
                                                             {student.name?.substring(0, 2).toUpperCase()}
                                                         </div>
                                                         <div>
-                                                            <p className="font-bold text-sm text-slate-800 dark:text-white group-hover:text-indigo-700 dark:text-indigo-400 transition-colors">{student.name}</p>
+                                                            <p className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">{student.name}</p>
                                                             <p className="text-[10px] text-slate-400 dark:text-slate-300">{student.registerNumber || student.registerNo || "—"}</p>
                                                         </div>
                                                         <Button
@@ -305,3 +305,4 @@ export default function RiskMonitorPage() {
         </div>
     );
 }
+

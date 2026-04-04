@@ -88,7 +88,7 @@ export default function FacultyApprovalsPage() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-6 animate-in fade-in duration-700">
             {/* Hero Header */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 shadow-2xl p-8 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_50%)]" />
@@ -215,3 +215,4 @@ export default function FacultyApprovalsPage() {
         </div>
     );
 }
+

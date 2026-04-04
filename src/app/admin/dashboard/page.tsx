@@ -41,6 +41,9 @@ import { Badge } from "@/components/ui/badge";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+const CHART_AXIS_COLOR = "hsl(var(--muted-foreground))";
+const CHART_GRID_COLOR = "hsl(var(--border))";
+
 export default function AdminDashboard() {
     const [students, setStudents] = useState<User[]>([]);
     const [faculty, setFaculty] = useState<User[]>([]);
@@ -191,7 +194,7 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-6 animate-in fade-in duration-700">
             {/* Premium Institutional Command Center Hero */}
             <div className="relative rounded-[40px] overflow-hidden bg-slate-950 shadow-3xl border border-white/5 group">
                 {/* Dynamic Background Elements */}
@@ -248,7 +251,7 @@ export default function AdminDashboard() {
                                     <span className="text-[10px] font-black text-emerald-400/80 tracking-widest">+2.4%</span>
                                 </div>
                             </div>
-                            <div className="mt-8 pt-6 border-t border-white/5 space-y-3">
+                            <div className="mt-5 pt-6 border-t border-white/5 space-y-3">
                                 <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     <span>Sync Status</span>
                                     <span className="text-blue-400">Verifying...</span>
@@ -263,7 +266,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Premium KPI Grid */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mt-8">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mt-5">
                 {[
                     { label: "Institutional Nodes", val: analytics.totalStudents, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" },
                     { label: "Faculty Directory", val: analytics.totalFaculty, icon: BookOpen, color: "text-indigo-500", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
@@ -284,7 +287,7 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-slate-500 transition-colors uppercase">{kpi.label}</p>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors uppercase">{kpi.label}</p>
                                 <div className="text-3xl font-black tracking-tighter text-slate-900 dark:text-white transition-transform duration-500 group-hover:translate-x-1">{kpi.val}</div>
                             </div>
                             {kpi.alert && (
@@ -340,7 +343,7 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            <div className="grid gap-8 lg:grid-cols-12 mt-8">
+            <div className="grid gap-6 lg:grid-cols-12 mt-5">
                 {/* Risk Distribution - Interactive Radial */}
                 <Card className="lg:col-span-4 border-none bg-white dark:bg-slate-900 shadow-3xl rounded-[40px] overflow-hidden group">
                     <CardHeader className="pb-2">
@@ -351,7 +354,7 @@ export default function AdminDashboard() {
                             <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-slate-100 dark:border-slate-800">Live Census</Badge>
                         </div>
                         <CardTitle className="text-lg font-black uppercase tracking-widest text-slate-800 dark:text-white">Risk Distribution</CardTitle>
-                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Institutional Placement Readiness</CardDescription>
+                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-300">Institutional Placement Readiness</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-8">
                         <div className="h-[320px] w-full relative">
@@ -400,7 +403,7 @@ export default function AdminDashboard() {
                                 <p className="text-5xl font-black text-slate-800 dark:text-white tracking-tighter">{analytics.avgPRI}</p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 mt-8">
+                        <div className="grid grid-cols-2 gap-4 mt-5">
                             {analytics.riskData.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50">
                                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
@@ -427,7 +430,7 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                         <CardTitle className="text-lg font-black uppercase tracking-widest text-slate-800 dark:text-white">Institutional Growth Trend</CardTitle>
-                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">PRI Consistency Metrics Over Strategic Eras</CardDescription>
+                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-300">PRI Consistency Metrics Over Strategic Eras</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-10">
                         <div className="h-[380px] w-full">
@@ -445,17 +448,17 @@ export default function AdminDashboard() {
                                     </defs>
                                     <XAxis
                                         dataKey="name"
-                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                        tickLine={{ stroke: "#000000" }}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
+                                        axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                        tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: CHART_AXIS_COLOR }}
                                         dy={10}
                                     />
                                     <YAxis
-                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                        tickLine={{ stroke: "#000000" }}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
+                                        axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                        tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: CHART_AXIS_COLOR }}
                                     />
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} strokeOpacity={0.35} />
                                     <Tooltip
                                         contentStyle={{
                                             backgroundColor: '#0f172a',
@@ -504,21 +507,21 @@ export default function AdminDashboard() {
                         <div className="h-[350px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={analytics.modulePerformance} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} strokeOpacity={0.35} />
                                     <XAxis
                                         dataKey="name"
                                         fontSize={10}
                                         fontWeight="black"
-                                        tickLine={{ stroke: "#000000" }}
-                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                        tick={{ dy: 10, fill: "#000000" }}
+                                        tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                        axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                        tick={{ dy: 10, fill: CHART_AXIS_COLOR }}
                                     />
                                     <YAxis
                                         fontSize={10}
                                         fontWeight="bold"
-                                        tickLine={{ stroke: "#000000" }}
-                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                        tick={{ fill: "#000000" }}
+                                        tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                        axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                        tick={{ fill: CHART_AXIS_COLOR }}
                                         domain={[0, 100]}
                                     />
                                     <Tooltip
@@ -539,3 +542,4 @@ export default function AdminDashboard() {
         </div>
     );
 }
+

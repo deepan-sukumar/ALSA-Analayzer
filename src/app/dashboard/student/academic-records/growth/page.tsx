@@ -2,11 +2,15 @@
 
 import { useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 export default function GrowthAnalyticsPage() {
     const { user } = useAuth();
+    const router = useRouter();
 
     const growthData = useMemo(() => {
         if (!user?.academicRecords || user.academicRecords.length === 0) return [];
@@ -17,15 +21,23 @@ export default function GrowthAnalyticsPage() {
     }, [user]);
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-500">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 shadow-xl p-7 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
                 <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
                 <div className="relative z-10">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/50 mb-1">Student Intelligence Portal</p>
-                    <h1 className="text-3xl font-black mb-2 tracking-tight">Growth Analytics 📈</h1>
-                    <p className="text-white/60 font-medium text-sm">Visualize your academic trajectory and performance consistency.</p>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => router.back()} 
+                        className="text-white/80 hover:text-white hover:bg-white/10 mb-2 -ml-2"
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                    </Button>
+                    <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/80 mb-1">Student Intelligence Portal</p>
+                    <h1 className="text-3xl font-black mb-2 tracking-tight leading-[1.15] pb-1">Growth Analytics 📈</h1>
+                    <p className="text-white/85 font-medium text-sm">Visualize your academic trajectory and performance consistency.</p>
                 </div>
             </div>
 
@@ -77,3 +89,4 @@ export default function GrowthAnalyticsPage() {
         </div>
     );
 }
+

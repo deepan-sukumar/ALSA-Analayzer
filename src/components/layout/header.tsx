@@ -38,7 +38,7 @@ export function Header() {
     const isDark = theme === "dark";
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm">
+        <header className="relative z-30 flex h-16 items-center gap-4 bg-transparent px-6 shadow-none">
             <Sheet>
                 <SheetTrigger asChild>
                     <Button variant="outline" size="icon" className="md:hidden">
@@ -51,7 +51,14 @@ export function Header() {
                         <SheetTitle>Navigation Menu</SheetTitle>
                         <SheetDescription>Access dashboard navigation and user settings</SheetDescription>
                     </SheetHeader>
-                    <Sidebar role={userRole === "faculty" || userRole === "student" ? userRole : "faculty"} />
+                    <Sidebar
+                        role={
+                            userRole === "faculty" || userRole === "student" || userRole === "admin"
+                                ? userRole
+                                : "student"
+                        }
+                        isMobile
+                    />
                 </SheetContent>
             </Sheet>
 

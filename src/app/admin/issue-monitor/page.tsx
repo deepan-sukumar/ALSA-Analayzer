@@ -156,7 +156,7 @@ export default function AdminIssueMonitor() {
     };
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700 pb-12">
+        <div className="space-y-6 animate-in fade-in duration-700 pb-12">
             {/* Premium Cognitive Sentinel Hero */}
             <div className="relative rounded-[48px] overflow-hidden bg-slate-950 border border-white/5 shadow-3xl group">
                 {/* Visual Background Elements */}
@@ -164,7 +164,7 @@ export default function AdminIssueMonitor() {
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay" />
 
                 <div className="relative z-10 p-12 md:p-16 flex flex-col lg:flex-row justify-between items-center gap-12">
-                    <div className="max-w-3xl space-y-8">
+                    <div className="max-w-3xl space-y-6">
                         <div className="inline-flex items-center gap-3 px-4 py-2 bg-rose-500/10 rounded-full border border-rose-500/20 backdrop-blur-md">
                             <Activity className="h-3.5 w-3.5 text-rose-400" />
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-300">Cognitive Sentinel Protocol</span>
@@ -370,7 +370,7 @@ export default function AdminIssueMonitor() {
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
                         <div className="grid grid-cols-2 gap-8">
                             {[
                                 { label: "Origin Object", val: selectedIssue?.userName || "Anonymous", icon: UserCircle },
@@ -470,3 +470,4 @@ export default function AdminIssueMonitor() {
 
 // Mock items to satisfy linter if needed, though they should be imported correctly from lucide
 // UserCircle is imported, Globe is imported.
+

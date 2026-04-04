@@ -23,6 +23,28 @@ type Question = {
     correctAnswer: string;
     difficulty: Difficulty;
 };
+type QuestionPayload = {
+    questions: Question[];
+    meta: {
+        source: "ai" | "system_fallback";
+        aiStatus: "ready" | "under_progress" | "unavailable";
+        note: string;
+        retryAfterMs: number;
+    };
+};
+
+function withQuestionMeta(
+    questions: Question[],
+    source: "ai" | "system_fallback",
+    aiStatus: "ready" | "under_progress" | "unavailable",
+    note: string,
+    retryAfterMs: number
+): QuestionPayload {
+    return {
+        questions,
+        meta: { source, aiStatus, note, retryAfterMs }
+    };
+}
 
 const fallbackTemplates: Record<Difficulty, (topic: string) => Omit<Question, "id" | "topic" | "difficulty">> = {
     easy: (topic) => ({
@@ -176,7 +198,15 @@ export async function POST(req: Request) {
 
         if (!hasValidAnthropic && !hasValidGemini) {
             console.log("No valid AI API keys found, using fallback questions.");
-            return NextResponse.json({ questions: generateFallbackQuestions(topics) });
+            return NextResponse.json(
+                withQuestionMeta(
+                    generateFallbackQuestions(topics),
+                    "system_fallback",
+                    "unavailable",
+                    "AI question engine is unavailable. Showing system-generated questions.",
+                    0
+                )
+            );
         }
 
         try {
@@ -269,7 +299,7 @@ Return ONLY valid JSON. Your response must be an object with a "questions" array
             if (hasValidGemini) {
                 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
                 const response = await ai.models.generateContent({
-                    model: 'gemini-2.0-flash',
+                    model: 'gemini-2.5-flash',
                     contents: prompt,
                     config: {
                         responseMimeType: "application/json",
@@ -301,7 +331,15 @@ Return ONLY valid JSON. Your response must be an object with a "questions" array
                 cleanJsonStr = response.text || "{}";
             } else {
                 console.log("No valid AI API keys found, using fallback questions.");
-                return NextResponse.json({ questions: generateFallbackQuestions(topics) });
+                return NextResponse.json(
+                    withQuestionMeta(
+                        generateFallbackQuestions(topics),
+                        "system_fallback",
+                        "unavailable",
+                        "AI question engine is unavailable. Showing system-generated questions.",
+                        0
+                    )
+                );
             }
 
                 cleanJsonStr = cleanJsonStr.replace(/^```(json)?\n?/i, "").replace(/\n?```$/i, "").trim();
@@ -310,11 +348,27 @@ Return ONLY valid JSON. Your response must be an object with a "questions" array
             const sanitized = sanitizeAIQuestions(result.questions || []);
             const processedQuestions = enforceDifficultyPlan(sanitized, topics);
 
-            return NextResponse.json({ questions: processedQuestions });
+            return NextResponse.json(
+                withQuestionMeta(
+                    processedQuestions,
+                    "ai",
+                    "ready",
+                    "",
+                    0
+                )
+            );
 
         } catch (aiError) {
             console.error("AI Generation failed, using fallback questions. Error:", aiError);
-            return NextResponse.json({ questions: generateFallbackQuestions(topics) });
+            return NextResponse.json(
+                withQuestionMeta(
+                    generateFallbackQuestions(topics),
+                    "system_fallback",
+                    "under_progress",
+                    "AI is under progress. Showing system-generated questions for now.",
+                    15000
+                )
+            );
         }
 
     } catch (error: unknown) {

@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Clock, UserCheck, ShieldAlert } from "lucide-react";
 
+const MAX_FAILED_ATTEMPTS = 3;
+
 export function FacultyTestUnlockRequests() {
     const { user } = useAuth();
     const [requests, setRequests] = useState<any[]>([]);
@@ -44,9 +46,10 @@ export function FacultyTestUnlockRequests() {
             const requestRef = doc(db, "testAccessControl", requestId);
             await updateDoc(requestRef, {
                 status: "allowed",
-                failedAttempts: 1, // Student gets exactly 1 more attempt. Next fail makes it 2 (locked).
+                failedAttempts: MAX_FAILED_ATTEMPTS - 1, // one extra attempt after approval
                 approvedAt: serverTimestamp(),
-                approvedBy: user?.name
+                approvedBy: user?.name,
+                unlockReason: ""
             });
             toast.success("Request approved! Student can now re-take the test.");
         } catch (error) {
@@ -109,6 +112,12 @@ export function FacultyTestUnlockRequests() {
                                 <Badge className="bg-amber-500 text-white text-[10px] font-bold">
                                     Last Fail: Malpractice
                                 </Badge>
+                            )}
+                            {req.unlockReason && (
+                                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1">Student Reason</p>
+                                    <p className="text-[11px] font-medium text-slate-700 dark:text-slate-200 leading-relaxed">{req.unlockReason}</p>
+                                </div>
                             )}
                             <div className="flex items-center gap-2 pt-1">
                                 <Button 

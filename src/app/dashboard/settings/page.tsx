@@ -99,7 +99,7 @@ export default function SettingsPage() {
     const allDepartments = [...IT_DEPARTMENTS, ...CORE_DEPARTMENTS];
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+        <div className="space-y-6 animate-in fade-in duration-500 pb-10">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 shadow-xl p-7 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_50%)]" />
@@ -261,3 +261,4 @@ export default function SettingsPage() {
         </div>
     );
 }
+

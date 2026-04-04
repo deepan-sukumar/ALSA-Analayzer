@@ -32,6 +32,10 @@ import {
 } from "recharts";
 import { User as AppUser } from "@/types";
 
+const CHART_AXIS_COLOR = "hsl(var(--muted-foreground))";
+const CHART_GRID_COLOR = "hsl(var(--border))";
+const LEGEND_TEXT_COLOR = "hsl(var(--foreground))";
+
 // ─── Custom Tooltip ─────────────────────────────────────────────────────────
 const DarkTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -171,7 +175,7 @@ export default function FacultyReportsPage() {
     );
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 px-1">
+        <div className="space-y-6 animate-in fade-in duration-500 px-1">
 
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 shadow-xl p-7">
@@ -254,20 +258,20 @@ export default function FacultyReportsPage() {
                     <div className="p-4">
                         <ResponsiveContainer width="100%" height={280}>
                             <BarChart data={reportData.cgpaDistribution} margin={{ left: 0, right: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#000000" strokeOpacity={0.2} vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_COLOR} strokeOpacity={0.35} vertical={false} />
                                 <XAxis
                                     dataKey="name"
-                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                    tickLine={{ stroke: "#000000" }}
+                                    axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                    tickLine={{ stroke: CHART_AXIS_COLOR }}
                                     fontSize={11}
                                     fontWeight={700}
-                                    tick={{ fill: "#000000" }}
+                                    tick={{ fill: CHART_AXIS_COLOR }}
                                 />
                                 <YAxis
-                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                    tickLine={{ stroke: "#000000" }}
+                                    axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                    tickLine={{ stroke: CHART_AXIS_COLOR }}
                                     fontSize={11}
-                                    tick={{ fill: "#000000" }}
+                                    tick={{ fill: CHART_AXIS_COLOR }}
                                 />
                                 <Tooltip content={<DarkTooltip />} cursor={{ fill: "rgba(59,130,246,0.06)", radius: 8 }} />
                                 <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} maxBarSize={50} />
@@ -302,12 +306,22 @@ export default function FacultyReportsPage() {
                                         <Cell key={i} fill={entry.fill} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }} />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: "#0f172a",
+                                        color: "#e2e8f0",
+                                        borderRadius: "12px",
+                                        border: "1px solid rgba(148,163,184,0.35)",
+                                        boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+                                    }}
+                                    itemStyle={{ color: "#e2e8f0" }}
+                                    labelStyle={{ color: "#cbd5e1" }}
+                                />
                                 <Legend
                                     layout="vertical"
                                     align="right"
                                     verticalAlign="middle"
-                                    formatter={(value) => <span style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>{value}</span>}
+                                    formatter={(value) => <span style={{ fontSize: 11, fontWeight: 700, color: LEGEND_TEXT_COLOR }}>{value}</span>}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
@@ -364,7 +378,7 @@ export default function FacultyReportsPage() {
 
             {/* ── Student Performance Log ── */}
             <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-lg overflow-hidden border-0">
-                <div className="px-6 py-5 border-b bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/60 flex items-center gap-3">
+                <div className="px-6 py-5 border-b bg-slate-50 dark:bg-slate-800/60 flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/50">
                         <Activity className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     </div>
@@ -379,7 +393,7 @@ export default function FacultyReportsPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700/60">
+                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700/60">
                                 <th className="py-4 px-6 font-extrabold text-[11px] uppercase tracking-wider text-slate-500 dark:text-white text-left">Student</th>
                                 <th className="py-4 px-4 font-extrabold text-[11px] uppercase tracking-wider text-slate-500 dark:text-white text-left">PRI</th>
                                 <th className="py-4 px-4 font-extrabold text-[11px] uppercase tracking-wider text-slate-500 dark:text-white text-left">Risk</th>
@@ -401,7 +415,7 @@ export default function FacultyReportsPage() {
                                                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-100 dark:from-indigo-950/60 to-violet-100 dark:to-violet-950/60 flex items-center justify-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 shrink-0">
                                                     {student.name?.substring(0, 2).toUpperCase()}
                                                 </div>
-                                                <span className="font-bold text-slate-800 dark:text-white group-hover:text-indigo-700 dark:text-indigo-400 transition-colors">{student.name}</span>
+                                                <span className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">{student.name}</span>
                                             </div>
                                         </td>
                                         <td className="py-3.5 px-4">
@@ -412,14 +426,14 @@ export default function FacultyReportsPage() {
                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${riskBadge} shadow-sm`}>{student.risk}</span>
                                         </td>
                                         <td className="py-3.5 px-4">
-                                            <span className="font-black text-slate-700 dark:text-slate-200 dark:text-slate-100">{student.cgpa}</span>
+                                            <span className="font-black text-slate-700 dark:text-slate-100">{student.cgpa}</span>
                                         </td>
                                         <td className="py-3.5 px-4">
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-sm font-black ${student.missingCore > 50 ? "text-red-500" : "text-indigo-600 dark:text-indigo-400"}`}>
                                                     {student.missingCore}%
                                                 </span>
-                                                <div className="w-20 h-2 bg-slate-100 dark:bg-slate-900/50 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div className="w-20 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                                     <div
                                                         className={`h-full rounded-full transition-all ${student.missingCore > 50 ? "bg-red-500" : "bg-indigo-500"}`}
                                                         style={{ width: `${Math.min(student.missingCore, 100)}%` }}
@@ -437,3 +451,4 @@ export default function FacultyReportsPage() {
         </div>
     );
 }
+

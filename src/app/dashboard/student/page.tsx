@@ -39,7 +39,7 @@ export default function StudentDashboard() {
                 const res = await fetch('/api/ai-recommendations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student: user })
+                    body: JSON.stringify({ student: user, context: 'overall' })
                 });
                 if (res.ok && !cancelled) {
                     const data = await res.json();

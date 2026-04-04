@@ -77,16 +77,16 @@ export default function EnrichmentPage() {
     const totalScore = calculateEnrichmentScore(enrichItems);
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+        <div className="space-y-6 animate-in fade-in duration-500 pb-10">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-amber-500 via-orange-600 to-rose-700 shadow-xl p-7 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
                 <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/50 mb-1">Student Intelligence Portal</p>
-                        <h1 className="text-3xl font-black mb-2 tracking-tight">Academic Enrichment Index 🏆</h1>
-                        <p className="text-white/60 font-medium text-sm">Unified professional readiness portfolio & achievements.</p>
+                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/80 mb-1">Student Intelligence Portal</p>
+                        <h1 className="text-3xl font-black mb-2 tracking-tight leading-[1.15] pb-1">Academic Enrichment Index 🏆</h1>
+                        <p className="text-white/85 font-medium text-sm">Unified professional readiness portfolio & achievements.</p>
                     </div>
                     <div className="flex flex-col md:flex-row items-center gap-4">
                         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 text-center min-w-[140px]">
@@ -175,7 +175,7 @@ export default function EnrichmentPage() {
                 })}
 
                 {enrichItems.length === 0 && (
-                    <div className="col-span-full py-20 text-center border-2 border-dashed rounded-3xl bg-muted/10">
+                    <div className="col-span-full py-12 text-center border-2 border-dashed rounded-3xl bg-muted/10">
                         <Award className="h-16 w-16 mx-auto text-muted-foreground opacity-20 mb-4" />
                         <h3 className="text-xl font-bold">Build Your Professional Portfolio</h3>
                         <p className="text-muted-foreground mb-8 max-w-sm mx-auto">Add certifications, projects, and research to improve your Professional Readiness Index (PRI).</p>
@@ -202,3 +202,6 @@ export default function EnrichmentPage() {
         </div>
     );
 }
+
+
+

@@ -18,7 +18,7 @@ import {
     getRedirectResult,
     User as FirebaseUser,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
 import {
     createUserDocument,
@@ -257,6 +257,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return () => unsubscribe();
     }, []);
+
+    // Keep role/approval in sync in real-time to avoid redirect flicker after admin actions.
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const userId = user.id;
+
+        const unsubscribeUsers = onSnapshot(doc(db, "users", userId), (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data() as any;
+
+            setUser((prev) => {
+                if (!prev || prev.id !== userId) return prev;
+                const mergedRaw = { ...(prev as any), ...data, id: userId } as UserDocData;
+                const normalized = firestoreDocToAppUser(mergedRaw);
+                const nextApproved =
+                    prev.approved === true
+                        ? true
+                        : (typeof normalized.approved === "boolean" ? normalized.approved : prev.approved);
+
+                return {
+                    ...prev,
+                    ...normalized,
+                    approved: nextApproved,
+                    loginProvider: prev.loginProvider,
+                    hasPassword: prev.hasPassword
+                } as AppUser;
+            });
+        });
+
+        const unsubscribeFaculty = onSnapshot(doc(db, "faculty", userId), (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data() as any;
+
+            setUser((prev) => {
+                if (!prev || prev.id !== userId) return prev;
+                const nextApproved = data.approved === true ? true : prev.approved;
+                const nextDepartment = data.department ?? prev.department;
+                const nextDesignation = data.designation ?? prev.designation;
+
+                return {
+                    ...prev,
+                    approved: nextApproved,
+                    department: nextDepartment,
+                    designation: nextDesignation
+                } as AppUser;
+            });
+        });
+
+        return () => {
+            unsubscribeUsers();
+            unsubscribeFaculty();
+        };
+    }, [user?.id]);
 
     // ─── Email / Password Login ───
     const login = async (data: { email: string; password: string }) => {

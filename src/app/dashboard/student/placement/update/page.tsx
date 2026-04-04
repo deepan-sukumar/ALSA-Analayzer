@@ -354,7 +354,7 @@ export default function OutcomeAlignmentPage() {
 
 
     return (
-        <div className="space-y-8 max-w-5xl mx-auto pb-10 animate-in fade-in duration-500">
+        <div className="space-y-6 max-w-5xl mx-auto pb-10 animate-in fade-in duration-500">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-950 shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)] dark:shadow-[0_10px_40px_-10px_rgba(30,27,75,0.8)] p-8 md:p-10 text-white group">
                 <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none"></div>
@@ -368,7 +368,7 @@ export default function OutcomeAlignmentPage() {
                             <Sparkles className="h-3 w-3 text-amber-300" />
                             <span>Student Intelligence Portal</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-100 drop-shadow-sm">Development Alignment</h1>
+                        <h1 className="text-4xl md:text-5xl font-black tracking-tight leading-[1.12] pb-1 text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-100 drop-shadow-sm">Development Alignment</h1>
                         <p className="text-white/80 font-medium text-base md:text-lg leading-relaxed">
                             Define your career trajectory and map your skills to industry standards. This drives your Professional Readiness Index (PRI).
                         </p>
@@ -482,7 +482,7 @@ export default function OutcomeAlignmentPage() {
                             );
                         })}
                     </div>
-                    <div className="mt-8 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm relative z-10">
+                    <div className="mt-5 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm relative z-10">
                         <span className="font-black text-indigo-900 dark:text-indigo-200 uppercase tracking-widest text-sm">Total Core Coverage</span>
                         <div className="flex items-baseline gap-1">
                             <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 drop-shadow-sm">{calculatedCoreProfile.coreCoverage}</span>
@@ -490,7 +490,7 @@ export default function OutcomeAlignmentPage() {
                         </div>
                     </div>
 
-                    <div className="flex justify-end pt-8 relative z-10 border-t border-slate-100 dark:border-slate-800 mt-6 md:mt-8">
+                    <div className="flex justify-end pt-6 relative z-10 border-t border-slate-100 dark:border-slate-800 mt-5 md:mt-6">
                         <Button
                             onClick={handleSaveCore}
                             disabled={loading}
@@ -563,7 +563,7 @@ export default function OutcomeAlignmentPage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="relative z-10 pt-8 space-y-10">
+                    <CardContent className="relative z-10 pt-8 space-y-6">
                         {/* CORE */}
                         <div className="space-y-5">
                             <div className="flex flex-col md:flex-row md:items-center justify-between border-l-4 border-emerald-500 pl-4 py-2 bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-950/30 rounded-r-xl gap-4">
@@ -763,3 +763,5 @@ export default function OutcomeAlignmentPage() {
         </div>
     );
 }
+
+

@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import * as admin from "firebase-admin";
 import { calculatePRI } from "@/lib/placement-calculations";
+
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+    });
+}
+
+const adminDb = admin.firestore();
 
 export async function GET() {
     try {
-        const usersRef = collection(db, "users");
-        const snapshot = await getDocs(usersRef);
+        const snapshot = await adminDb.collection("users").get();
 
         const allDeepaks: any[] = [];
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
             if (data.name && data.name.toLowerCase().includes("deepak")) {
                 const priObj = calculatePRI(data as any);
                 allDeepaks.push({
-                    id: doc.id,
+                    id: docSnap.id,
                     name: data.name,
                     email: data.email,
                     role: data.role,
@@ -32,6 +38,6 @@ export async function GET() {
         });
 
     } catch (e: any) {
-        return NextResponse.json({ error: e.message });
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

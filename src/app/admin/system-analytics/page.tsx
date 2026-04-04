@@ -40,6 +40,10 @@ import { db } from "@/lib/firebase";
 import { calculatePRI } from "@/lib/placement-calculations";
 import { User } from "@/types";
 
+const CHART_AXIS_COLOR = "hsl(var(--muted-foreground))";
+const CHART_GRID_COLOR = "hsl(var(--border))";
+const CHART_LABEL_COLOR = "hsl(var(--foreground))";
+
 export default function AdminSystemAnalytics() {
     const [students, setStudents] = useState<User[]>([]);
     const [faculty, setFaculty] = useState<User[]>([]);
@@ -136,14 +140,14 @@ export default function AdminSystemAnalytics() {
     }
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700 pb-12">
+        <div className="space-y-6 animate-in fade-in duration-700 pb-12">
             {/* Premium Macro-Observatory Hero */}
             <div className="relative rounded-[48px] overflow-hidden bg-slate-950 border border-white/5 shadow-3xl group">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_120%,rgba(99,102,241,0.15),transparent_50%)]" />
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay" />
 
                 <div className="relative z-10 p-12 md:p-16 flex flex-col lg:flex-row justify-between gap-12">
-                    <div className="max-w-3xl space-y-8">
+                    <div className="max-w-3xl space-y-6">
                         <div className="inline-flex items-center gap-3 px-4 py-2 bg-indigo-500/10 rounded-full border border-indigo-500/20 backdrop-blur-md">
                             <Database className="h-3.5 w-3.5 text-indigo-400" />
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300">Global System Observability</span>
@@ -228,7 +232,7 @@ export default function AdminSystemAnalytics() {
                             <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-slate-100 dark:border-slate-800">Processing...</Badge>
                         </div>
                         <CardTitle className="text-lg font-black uppercase tracking-widest text-slate-800 dark:text-white">Growth Trajectory</CardTitle>
-                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Institutional Onboarding Velocity</CardDescription>
+                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-300">Institutional Onboarding Velocity</CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 pt-10">
                         <div className="h-[320px] w-full">
@@ -240,18 +244,18 @@ export default function AdminSystemAnalytics() {
                                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} strokeOpacity={0.35} />
                                     <XAxis
                                         dataKey="week"
-                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                        tickLine={{ stroke: "#000000" }}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
+                                        axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                        tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: CHART_AXIS_COLOR }}
                                         dy={10}
                                     />
                                     <YAxis
-                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                        tickLine={{ stroke: "#000000" }}
-                                        tick={{ fontSize: 10, fontWeight: 900, fill: "#000000" }}
+                                        axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                        tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                        tick={{ fontSize: 10, fontWeight: 900, fill: CHART_AXIS_COLOR }}
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#0f172a', borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', padding: '16px', fontWeight: '900', textTransform: 'uppercase', fontSize: '10px', color: '#fff' }}
@@ -273,7 +277,7 @@ export default function AdminSystemAnalytics() {
                             <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-slate-100 dark:border-slate-800">Verified</Badge>
                         </div>
                         <CardTitle className="text-lg font-black uppercase tracking-widest text-slate-800 dark:text-white">Role Composition</CardTitle>
-                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">User Identity Distribution</CardDescription>
+                        <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-300">User Identity Distribution</CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 pt-10">
                         <div className="h-[320px] w-full">
@@ -314,7 +318,7 @@ export default function AdminSystemAnalytics() {
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-black uppercase tracking-widest text-slate-800 dark:text-white">Departmental Heatmap</CardTitle>
-                                <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Canonical Readiness Distribution</CardDescription>
+                                <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-300">Canonical Readiness Distribution</CardDescription>
                             </div>
                         </div>
                         <div className="px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
@@ -326,12 +330,12 @@ export default function AdminSystemAnalytics() {
                     <div className="h-[400px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={analytics.deptData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} strokeOpacity={0.35} />
                                 <XAxis
                                     dataKey="name"
-                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                    tickLine={{ stroke: "#000000" }}
-                                    tick={{ fontSize: 9, fontWeight: 900, fill: "#000000" }}
+                                    axisLine={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
+                                    tickLine={{ stroke: CHART_AXIS_COLOR }}
+                                    tick={{ fontSize: 9, fontWeight: 900, fill: CHART_AXIS_COLOR }}
                                     angle={-45}
                                     textAnchor="end"
                                 />
@@ -344,7 +348,7 @@ export default function AdminSystemAnalytics() {
                                     dataKey="avg"
                                     radius={[12, 12, 0, 0]}
                                     barSize={45}
-                                    label={{ position: 'top', fill: '#64748b', fontSize: 10, fontWeight: 900, formatter: (val: any) => `${val}%` }}
+                                    label={{ position: 'top', fill: CHART_LABEL_COLOR, fontSize: 10, fontWeight: 900, formatter: (val: any) => `${val}%` }}
                                 >
                                     {analytics.deptData.map((entry, index) => (
                                         <Cell
@@ -384,3 +388,4 @@ export default function AdminSystemAnalytics() {
         </div>
     );
 }
+

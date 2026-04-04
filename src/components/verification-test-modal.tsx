@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { AlertCircle, Maximize, Clock, ShieldAlert, Loader2, Lock, UserCheck } f
 import { CoreTopicSelection } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { normalizeDepartment } from "@/lib/department-core";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Question {
     id: string;
@@ -30,6 +31,7 @@ interface VerificationTestModalProps {
 
 const TARGET_QUESTION_COUNT = 10; // 6 easy + 3 medium + 1 hard
 const PASS_SCORE_OUT_OF_TEN = 5;
+const MAX_FAILED_ATTEMPTS = 3;
 
 function normalizeSelectedTopics(selectedTopics: CoreTopicSelection): string[] {
     return Array.from(
@@ -59,6 +61,8 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
     const [faculties, setFaculties] = useState<any[]>([]);
     const [selectedFacultyId, setSelectedFacultyId] = useState<string>("");
     const [isRequesting, setIsRequesting] = useState(false);
+    const [unlockReason, setUnlockReason] = useState("");
+    const [generationNote, setGenerationNote] = useState("");
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const hasSubmittedRef = useRef(false);
@@ -84,7 +88,7 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                 setAccessDocId(docSnap.id);
                 if (data.status === "pending_approval") {
                     setAttemptStatus("pending_approval");
-                } else if (data.status === "locked" || data.failedAttempts >= 2) {
+                } else if (data.status === "locked" || data.failedAttempts >= MAX_FAILED_ATTEMPTS) {
                     setAttemptStatus("locked");
                     fetchFaculties();
                 } else {
@@ -110,6 +114,10 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
             toast.error("Please select a faculty member.");
             return;
         }
+        if (unlockReason.trim().length < 10) {
+            toast.error("Please provide a valid reason (at least 10 characters).");
+            return;
+        }
         setIsRequesting(true);
         const selFac = faculties.find(f => f.id === selectedFacultyId);
         try {
@@ -118,6 +126,7 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                     status: "pending_approval",
                     requestedFacultyId: selectedFacultyId,
                     requestedFacultyName: selFac?.name || "Faculty",
+                    unlockReason: unlockReason.trim(),
                     timestamp: serverTimestamp()
                 });
             } else {
@@ -126,14 +135,16 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                     studentName: user?.name,
                     topicsKey,
                     status: "pending_approval",
-                    failedAttempts: 2,
+                    failedAttempts: MAX_FAILED_ATTEMPTS,
                     requestedFacultyId: selectedFacultyId,
                     requestedFacultyName: selFac?.name || "Faculty",
+                    unlockReason: unlockReason.trim(),
                     timestamp: serverTimestamp()
                 });
                 setAccessDocId(docRef.id);
             }
             setAttemptStatus("pending_approval");
+            setUnlockReason("");
             toast.success("Unlock request sent to faculty!");
         } catch (error) {
             console.error(error);
@@ -144,6 +155,7 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
 
     const loadQuestions = async () => {
         setStep("loading");
+        setGenerationNote("");
         try {
             if (flatTopics.length === 0) {
                 toast.error("No topics selected.");
@@ -167,6 +179,32 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                     console.log("AI Questions Data Received:", data);
                     if (data.questions && data.questions.length > 0) {
                         fetchedQuestions = data.questions;
+                    }
+                    if (data?.meta?.note) {
+                        setGenerationNote(data.meta.note);
+                    }
+                    if (data?.meta?.source === "system_fallback" && data?.meta?.retryAfterMs > 0) {
+                        toast.info("AI is under progress. System-generated questions are shown now.");
+                        window.setTimeout(async () => {
+                            try {
+                                const retryRes = await fetch("/api/ai-verification-test", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ topics: flatTopics })
+                                });
+                                if (!retryRes.ok) return;
+                                const retryData = await retryRes.json();
+                                if (retryData?.meta?.source === "ai" && Array.isArray(retryData.questions) && retryData.questions.length > 0) {
+                                    const retryShuffled = retryData.questions.sort(() => 0.5 - Math.random()).slice(0, TARGET_QUESTION_COUNT);
+                                    const retryFinal = retryShuffled.map((q: Question) => ({ ...q, options: [...q.options].sort(() => 0.5 - Math.random()) }));
+                                    setQuestions(retryFinal);
+                                    setGenerationNote("AI is now ready. Questions auto-updated.");
+                                    toast.success("AI recovered. Questions auto-updated.");
+                                }
+                            } catch (retryError) {
+                                console.error("AI retry failed for verification test:", retryError);
+                            }
+                        }, data.meta.retryAfterMs);
                     }
                 } else {
                     const errorText = await res.text();
@@ -290,10 +328,12 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
         try {
             // Get current attempt number
             let currentAttemptNum = 1;
+            let currentFailedAttempts = 0;
             if (accessDocId) {
                 const snap = await getDocs(query(collection(db, "testAccessControl"), where("__name__", "==", accessDocId)));
                 if (!snap.empty) {
-                    currentAttemptNum = (snap.docs[0].data().failedAttempts || 0) + 1;
+                    currentFailedAttempts = snap.docs[0].data().failedAttempts || 0;
+                    currentAttemptNum = currentFailedAttempts + 1;
                 }
             }
 
@@ -320,8 +360,10 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
             // Track attempt limits
             if (!isPass) {
                 if (accessDocId) {
+                    const nextFailedAttempts = currentFailedAttempts + 1;
                     await updateDoc(doc(db, "testAccessControl", accessDocId), { 
-                        failedAttempts: increment(1),
+                        failedAttempts: nextFailedAttempts,
+                        status: nextFailedAttempts >= MAX_FAILED_ATTEMPTS ? "locked" : "allowed",
                         studentName: user?.name || "Student",
                         registerNumber: user?.registerNumber || user?.registerNo || "N/A",
                         department: user?.department || "N/A",
@@ -370,6 +412,8 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
             setScore(0);
             setPassed(false);
             setMalpracticeDetected(false);
+            setUnlockReason("");
+            setGenerationNote("");
             checkAccessControl();
         }
     }, [isOpen]);
@@ -494,7 +538,7 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                         </div>
                         <h2 className="text-2xl font-black text-slate-800 dark:text-white">Maximum Attempts Reached</h2>
                         <p className="text-slate-500 max-w-md mx-auto">
-                            You have failed this test 2 times. To take it again, you must request unlock permission from a faculty member.
+                            You have reached {MAX_FAILED_ATTEMPTS} failed attempts. To take the test again, explain your reason and request faculty approval.
                         </p>
                         
                         <div className="max-w-sm mx-auto text-left space-y-2 pt-4">
@@ -510,10 +554,20 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        <div className="max-w-sm mx-auto text-left space-y-2">
+                            <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Reason for extra attempt</label>
+                            <Textarea
+                                value={unlockReason}
+                                onChange={(e) => setUnlockReason(e.target.value)}
+                                placeholder="Explain why you need another attempt..."
+                                className="min-h-[96px]"
+                            />
+                        </div>
                         
                         <div className="flex justify-center gap-4 pt-4">
                             <Button variant="outline" onClick={onClose}>Cancel</Button>
-                            <Button onClick={handleRequestUnlock} disabled={isRequesting || !selectedFacultyId} className="bg-red-600 hover:bg-red-700 text-white">
+                            <Button onClick={handleRequestUnlock} disabled={isRequesting || !selectedFacultyId || unlockReason.trim().length < 10} className="bg-red-600 hover:bg-red-700 text-white">
                                 {isRequesting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
                                 Request Unlock Permission
                             </Button>
@@ -540,6 +594,9 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                                 <li className="flex items-center gap-3"><ShieldAlert className="h-5 w-5 text-slate-400" /> Copy/paste & Context menus are disabled</li>
                                 <li className="flex items-center gap-3"><Clock className="h-5 w-5 text-slate-400" /> Timer: 8 minutes for {TARGET_QUESTION_COUNT} questions</li>
                                 <li className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400"><ShieldAlert className="h-5 w-5" /> Passing criteria: {PASS_SCORE_OUT_OF_TEN} / 10</li>
+                                <li className="flex items-center gap-3 text-amber-600 dark:text-amber-400"><Lock className="h-5 w-5" /> Maximum failed attempts allowed: {MAX_FAILED_ATTEMPTS}</li>
+                                <li className="flex items-center gap-3"><UserCheck className="h-5 w-5 text-slate-400" /> After {MAX_FAILED_ATTEMPTS} failed attempts, you must submit a reason and request faculty approval for unlock</li>
+                                <li className="flex items-center gap-3"><ShieldAlert className="h-5 w-5 text-slate-400" /> Malpractice or auto-submit due to violations counts as a failed attempt</li>
                             </ul>
                         </div>
                         <DialogFooter className="mt-6">
@@ -553,11 +610,19 @@ export function VerificationTestModal({ isOpen, onClose, selectedTopics, onVerif
                     <div className="flex flex-col items-center justify-center py-20 space-y-4">
                         <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
                         <h3 className="text-lg font-bold">Generating secure test...</h3>
+                        {generationNote ? (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium text-center max-w-md">{generationNote}</p>
+                        ) : null}
                     </div>
                 )}
 
                 {step === "test" && questions.length > 0 && (
                     <div className="space-y-6 animate-in fade-in">
+                        {generationNote ? (
+                            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                                {generationNote}
+                            </div>
+                        ) : null}
                         <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                             <div className="font-bold text-slate-600 dark:text-slate-400">
                                 Question {currentQIndex + 1} of {questions.length}

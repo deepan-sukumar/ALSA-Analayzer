@@ -1,234 +1,210 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
+import { ROLE_SKILL_MATRIX, PlacementRole } from '@/lib/role-skills';
 
-function generateFallbackRecommendations(student: any) {
-    const drawbacks = [];
-    const roadmap = [];
+function parseStructuredJson(raw: string): any {
+    const cleaned = String(raw || "")
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+
+    if (!cleaned) return {};
+    try {
+        return JSON.parse(cleaned);
+    } catch {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+            const sliced = cleaned.slice(start, end + 1);
+            return JSON.parse(sliced);
+        }
+        return {};
+    }
+}
+
+function generateFallbackRecommendations(student: any, context: string) {
+    const drawbacks: any[] = [];
+    const roadmap: { week: string; priority: string; focus: string; tasks: string[] }[] = [];
 
     const cgpa = parseFloat(student.cgpa) || 0;
-    const standingArrears = parseInt(student.standingArrears || student.arrears || 0);
+    const standingArrears = parseInt(String(student.standingArrears ?? student.arrears ?? 0), 10);
     const aptitudeScore = student.placementMetrics?.aptitudeScore || 0;
     const codingScore = student.placementMetrics?.codingScore || 0;
     const commScore = student.placementMetrics?.communicationScore || 0;
-    const certCount = student.certifications?.length || 0;
-    const enrichCount = student.enrichment?.length || 0;
 
-    // Drawbacks Logic
-    if (standingArrears > 0) {
-        drawbacks.push({
-            drawback: `Active Standing Arrears (${standingArrears})`,
-            suggestion: `To fix this, you should focus only on passing these pending subjects first. Stop spending time on new skills until these are cleared. Register for the supplementary exams immediately.`
-        });
-        roadmap.push({
-            week: "Week 1-2",
-            priority: "Critical",
-            focus: "Arrear Clearance & Core Academics",
-            tasks: ["Identify arrear subjects and gather past question papers", "Dedicate 2 hours daily specifically for arrear subjects"]
-        });
+    const selectedTopics = student.coreAcademicTopics || {};
+    const verifiedTopics = student.verifiedCoreTopics || {};
+    let pendingCount = 0;
+    const pendingList: string[] = [];
+    Object.keys(selectedTopics).forEach((k) => {
+        const sel = selectedTopics[k] || [];
+        const ver = verifiedTopics[k] || [];
+        const pending = sel.filter((t: string) => !ver.includes(t));
+        pendingCount += pending.length;
+        if (pending.length > 0) pendingList.push(`${k}: ${pending.join(', ')}`);
+    });
+
+    const roleTrack = student.roleTrackProfile?.trackSelected || student.outcomeAlignment?.role?.trackSelected || student.outcomeAlignment?.trackSelected;
+    const verifiedRoleSkills = student.verifiedRoleConcepts || { core: [], intermediate: [], advanced: [] };
+    let missingRoleSkills: string[] = [];
+    if (roleTrack && ROLE_SKILL_MATRIX[roleTrack as PlacementRole]) {
+        const matrix = ROLE_SKILL_MATRIX[roleTrack as PlacementRole];
+        const mCore = matrix.core.filter(s => !verifiedRoleSkills.core?.includes(s));
+        const mInter = matrix.intermediate.filter(s => !verifiedRoleSkills.intermediate?.includes(s));
+        const mAdv = matrix.advanced.filter(s => !verifiedRoleSkills.advanced?.includes(s));
+        missingRoleSkills = [...mCore, ...mInter, ...mAdv];
     }
 
-    if (cgpa > 0 && cgpa < 6.5) {
-        drawbacks.push({
-            drawback: `Low Academic Performance (CGPA: ${cgpa})`,
-            suggestion: `Top companies filter out students with a CGPA below 6.5. To fix this, aim to score very high grades in your current and upcoming semesters to pull your overall average up.`
-        });
-        if (roadmap.length === 0) {
-            roadmap.push({
-                week: "Week 1-2",
-                priority: "Critical",
-                focus: "Academic Revival",
-                tasks: ["Review current semester syllabus", "Seek help from peers or faculty for difficult subjects"]
-            });
+    const addTaskToRoadmap = (weekLabel: string, priority: string, focus: string, newTasks: string[]) => {
+        const existing = roadmap.find(r => r.week === weekLabel);
+        if (existing) {
+            existing.tasks = [...new Set([...existing.tasks, ...newTasks])].slice(0, 4);
+            if (priority === "Critical" || (priority === "High" && existing.priority !== "Critical")) {
+                existing.priority = priority;
+            }
+        } else {
+            roadmap.push({ week: weekLabel, priority, focus, tasks: newTasks });
+        }
+    };
+
+    if (pendingCount > 0) {
+        drawbacks.push({ drawback: `Unverified Core Topics (${pendingCount} pending)`, suggestion: `Complete verification tests for: ${pendingList.join(' | ')}.` });
+        addTaskToRoadmap("Week 1-2", "Critical", "Core Domain Clearance", [`Review pending topics: ${pendingList.slice(0, 2).join(', ')}`, "Attempt AI verification tests"]);
+    }
+
+    if (missingRoleSkills.length > 0 && (context === "outcome" || context === "overall")) {
+        drawbacks.push({ drawback: `Role Alignment Gaps (${roleTrack})`, suggestion: `Master missing skills: ${missingRoleSkills.slice(0, 5).join(', ')}.` });
+        addTaskToRoadmap("Week 1-2", "High", `${roleTrack} Competency`, [`Master core skills: ${missingRoleSkills.slice(0, 3).join(', ')}`, "Review interview questions"]);
+    }
+
+    if (context === "academic" || context === "overall") {
+        if (standingArrears > 0) {
+            drawbacks.push({ drawback: `Active Arrears (${standingArrears})`, suggestion: `Focus on clearing pending subjects first.` });
+            addTaskToRoadmap("Week 3-4", "Critical", "Arrear Clearance", ["Gather past papers", "Dedicate specific study hours"]);
+        }
+        if (cgpa > 0 && cgpa < 6.5) {
+            drawbacks.push({ drawback: `Low CGPA (${cgpa})`, suggestion: `Aim for higher grades in upcoming semesters.` });
+            addTaskToRoadmap("Week 1-2", "High", "Academic Revival", ["Seek faculty guidance", "Practice university questions"]);
         }
     }
 
-    if (codingScore < 60) {
-        drawbacks.push({
-            drawback: `Weak Programming Skills (${codingScore}%)`,
-            suggestion: `Your coding speed is too slow for technical rounds. To fix this, pick one language (like Python or Java) and solve 2 basic Data Structures and Algorithms problems every single day.`
-        });
-        roadmap.push({
-            week: roadmap.length > 0 ? "Week 3-4" : "Week 1-2",
-            priority: "High",
-            focus: "DSA & Programming Logic",
-            tasks: ["Solve 3-5 basic problems on LeetCode/HackerRank daily", "Master Arrays, Strings, and basic sorting algorithms"]
-        });
-    }
-
-    if (aptitudeScore < 60) {
-        drawbacks.push({
-            drawback: `Below Average Aptitude (${aptitudeScore}%)`,
-            suggestion: `You are failing standard math and logic tests. To fix this, practice 15 quantitative math questions (like Profit & Loss, Time & Speed) every evening using a timer.`
-        });
-        roadmap.push({
-            week: roadmap.length > 0 ? (roadmap.length === 1 ? "Week 3-4" : "Week 5-6") : "Week 1-2",
-            priority: "Moderate",
-            focus: "Quantitative & Logical Reasoning",
-            tasks: ["Practice 20 aptitude questions daily (Time & Work, Profit & Loss)", "Take two 30-minute timed mock tests per week"]
-        });
-    }
-
-    if (commScore < 60) {
-        drawbacks.push({
-            drawback: `Communication Gaps (${commScore}%)`,
-            suggestion: `You will struggle to pass HR rounds. To fix this, practice speaking English aloud for 15 minutes a day, and record yourself answering standard interview questions like 'Tell me about yourself'.`
-        });
-        if (roadmap.length < 3) {
-            roadmap.push({
-                week: roadmap.length === 0 ? "Week 1-2" : roadmap.length === 1 ? "Week 3-4" : "Week 5-6",
-                priority: "Moderate",
-                focus: "Verbal Articulation",
-                tasks: ["Read one technical article out loud daily", "Participate in mock interviews or peer group discussions"]
-            });
+    if (context === "outcome" || context === "overall") {
+        if (codingScore < 60) {
+            drawbacks.push({ drawback: `Weak Coding (${codingScore}%)`, suggestion: `Solve 2 DSA problems daily.` });
+            addTaskToRoadmap("Week 3-4", "High", "DSA Logic", ["Practice on LeetCode daily", "Master Arrays & Strings"]);
+        }
+        if (aptitudeScore < 60) {
+            drawbacks.push({ drawback: `Low Aptitude (${aptitudeScore}%)`, suggestion: `Practice quantitative math daily.` });
+            addTaskToRoadmap("Week 5-6", "Moderate", "Quantitative Reasoning", ["Take timed mock tests", "Practice quant daily"]);
         }
     }
 
-    if (certCount === 0 && enrichCount === 0) {
-        drawbacks.push({
-            drawback: `Empty Professional Portfolio`,
-            suggestion: `Your resume has nothing extra to show. To fix this, enroll in one free online course (like AWS, Google, or Coursera) related to your field and finish the certification.`
-        });
+    const weekMap: any = { "Week 1-2": 1, "Week 3-4": 2, "Week 5-6": 3 };
+    const finalRoadmap = ["Week 1-2", "Week 3-4", "Week 5-6"].map(w => {
+        const found = roadmap.find(r => r.week === w);
+        return found || { week: w, priority: "Standard", focus: "Skills Refinement", tasks: ["Focus on core concepts", "Review technical documentation"] };
+    });
+
+    return { drawbacks: drawbacks.slice(0, 8), roadmap: finalRoadmap };
+}
+
+function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
+    const aiDrawbacks = Array.isArray(aiResult?.drawbacks) ? aiResult.drawbacks : [];
+    const aiRoadmap = Array.isArray(aiResult?.roadmap) ? aiResult.roadmap : [];
+    const mandatory = generateFallbackRecommendations(student, context);
+
+    const mergedDrawbacks = [...aiDrawbacks];
+    const existing = new Set(mergedDrawbacks.map((d: any) => String(d?.drawback || "").toLowerCase().trim()));
+
+    for (const item of mandatory.drawbacks) {
+        const key = String(item.drawback || "").toLowerCase().trim();
+        if (key && !existing.has(key)) {
+            mergedDrawbacks.push(item);
+            existing.add(key);
+        }
     }
 
-    // Default if profile is absolutely flawless
-    if (drawbacks.length === 0) {
-        drawbacks.push({
-            drawback: `Advanced Specialization Needed`,
-            suggestion: `Profile is very strong across basic metrics. Shift focus to advanced topics (e.g., System Design, Cloud) or open-source contributions.`
-        });
-        roadmap.push({
-            week: "Week 1-3",
-            priority: "Standard",
-            focus: "Advanced Technical Depth",
-            tasks: ["Build a full-stack project or contribute to open-source", "Start learning System Design concepts"]
-        });
-        roadmap.push({
-            week: "Week 4-6",
-            priority: "Standard",
-            focus: "Interview Polish",
-            tasks: ["Schedule multiple mock interviews", "Prepare STAR format answers for behavioral questions"]
-        });
-    }
-
-    return { drawbacks: drawbacks.slice(0, 5), roadmap: roadmap.slice(0, 3) };
+    const finalRoadmap = aiRoadmap.length > 0 ? aiRoadmap : mandatory.roadmap;
+    return { drawbacks: mergedDrawbacks.slice(0, 8), roadmap: finalRoadmap.slice(0, 3) };
 }
 
 export async function POST(req: Request) {
     try {
-        const { student } = await req.json();
+        const body = await req.json();
+        const { student, context = "overall" } = body;
 
-        if (!student) {
-            return NextResponse.json({ error: "Student data is required" }, { status: 400 });
+        if (!student) return NextResponse.json({ error: "Student data required" }, { status: 400 });
+
+        const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        if (!geminiKey) {
+            const result = generateFallbackRecommendations(student, context);
+            return NextResponse.json(result);
         }
 
-        // If no API key is provided, safely fallback to algorithmic generation
-        if (!process.env.GEMINI_API_KEY) {
-            console.log("No GEMINI_API_KEY found, using algorithmic recommendations.");
-            return NextResponse.json(generateFallbackRecommendations(student));
-        }
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        const cgpa = student.cgpa || "N/A";
+        const roleTrack = student.roleTrackProfile?.trackSelected || student.outcomeAlignment?.trackSelected || "Not Selected";
 
-        try {
-            // Attempt GenAI processing if key exists
-            const ai = new GoogleGenAI({});
-            const certCount = student.certifications?.length || 0;
-            const enrichCount = student.enrichment?.length || 0;
-            const standingArrears = student.standingArrears || student.arrears || 0;
-            const cgpa = student.cgpa || "N/A";
-            const aptitudeScore = student.placementMetrics?.aptitudeScore || 0;
-            const codingScore = student.placementMetrics?.codingScore || 0;
-            const commScore = student.placementMetrics?.communicationScore || 0;
-            const roleTrack = student.roleTrackProfile?.trackSelected || student.outcomeAlignment?.trackSelected || "Not Selected";
+        const selectedTopics = student.coreAcademicTopics || {};
+        const verifiedTopics = student.verifiedCoreTopics || {};
+        const incompleteList: string[] = [];
+        Object.keys(selectedTopics).forEach((subject) => {
+            const pending = (selectedTopics[subject] || []).filter((t: string) => !(verifiedTopics[subject] || []).includes(t));
+            if (pending.length > 0) incompleteList.push(`${subject}: ${pending.join(', ')}`);
+        });
 
-            const prompt = `
-            You are an expert academic and placement counselor.
-            Please analyze the following student profile and identify explicitly what they are weak in (the faults or weaknesses), 
-            along with corrections or ideas to make those areas strong. Also provide a 6-week roadmap.
+        const prompt = `Analyze this student profile for context: ${context}.
+        CGPA: ${cgpa}, Arrears: ${student.standingArrears || 0}, Role: ${roleTrack}.
+        Scores: Aptitude ${student.placementMetrics?.aptitudeScore || 0}%, Coding ${student.placementMetrics?.codingScore || 0}%, Comm ${student.placementMetrics?.communicationScore || 0}%.
+        Incomplete Topics: ${incompleteList.join(' | ') || "None"}.
+        Identify 4-8 weaknesses/faults and a 6-week roadmap (3 phases: Week 1-2, Week 3-4, Week 5-6).
+        Return purely JSON with "drawbacks" (drawback, suggestion) and "roadmap" (week, priority: Critical/High/Moderate/Standard, focus, tasks: string[]).`;
 
-            Student Profile Summary:
-            - Department: ${student.department || "N/A"}
-            - CGPA: ${cgpa}
-            - Standing Arrears: ${standingArrears}
-            - Certifications Count: ${certCount}
-            - Enrichment Activities Count: ${enrichCount}
-            - Aptitude Score: ${aptitudeScore}%
-            - Coding Score: ${codingScore}%
-            - Communication Score: ${commScore}%
-            - Target Role/Track: ${roleTrack}
-
-            If they have arrears, this is a critical fault.
-            If their CGPA is low (< 6.5), this is a high-priority academic weakness.
-            If their aptitude or coding scores are low (< 60%), these indicate severe skill gaps.
-            If they lack certifications or enrichment, they have a weak portfolio.
-
-            VITAL INSTRUCTION: For the "suggestion" field, do NOT use complex corporate jargon. Use a very simple, everyday English explanation of the exact idea to improve. 
-            Start the suggestion by directly explaining the 'why' followed by 'To fix this, you should...'. 
-            Example: "You are failing standard math tests. To fix this, practice 15 quantitative math questions every evening using a timer."
-
-            Return exactly 3-5 weaknesses/faults and a 6-phase roadmap (Weeks 1 to 6 or grouped like Week 1-2, etc.).
-            `;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
-                contents: prompt,
-                config: {
-                    temperature: 0.7,
-                    responseModalities: ["TEXT"],
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.OBJECT,
-                        properties: {
-                            drawbacks: {
-                                type: Type.ARRAY,
-                                items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        drawback: { type: Type.STRING, description: "Explicit statement of the fault, weakness, or gap" },
-                                        suggestion: { type: Type.STRING, description: "Simple, easy-to-understand explanation of the idea to improve. Must be written in plain English, starting with a clear action." }
-                                    },
-                                    required: ["drawback", "suggestion"]
-                                }
-                            },
-                            roadmap: {
-                                type: Type.ARRAY,
-                                items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        week: { type: Type.STRING, description: "e.g., Week 1-2: Core Fixes" },
-                                        priority: { type: Type.STRING, description: "Must be one of: Critical, High, Moderate, Standard" },
-                                        focus: { type: Type.STRING, description: "Main theme of the week" },
-                                        tasks: {
-                                            type: Type.ARRAY,
-                                            items: { type: Type.STRING, description: "Specific actionable task" }
-                                        }
-                                    },
-                                    required: ["week", "priority", "focus", "tasks"]
-                                }
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                temperature: 0.7,
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        drawbacks: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    drawback: { type: Type.STRING },
+                                    suggestion: { type: Type.STRING }
+                                },
+                                required: ["drawback", "suggestion"]
                             }
                         },
-                        required: ["drawbacks", "roadmap"]
-                    }
+                        roadmap: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    week: { type: Type.STRING },
+                                    priority: { type: Type.STRING },
+                                    focus: { type: Type.STRING },
+                                    tasks: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                },
+                                required: ["week", "priority", "focus", "tasks"]
+                            }
+                        }
+                    },
+                    required: ["drawbacks", "roadmap"]
                 }
-            });
+            }
+        });
 
-            const textResponse = response.text || "{}";
-            const result = JSON.parse(textResponse);
+        const result = parseStructuredJson(response.text || "{}");
+        const merged = mergeAndEnsureCoverage(result, student, context);
 
-            return NextResponse.json({
-                drawbacks: result.drawbacks || [],
-                roadmap: result.roadmap || []
-            });
-
-        } catch (genAiError) {
-            // Safely fallback to algorithmic generation if Gemini quota exceeded or network fails
-            console.error("Gemini AI failed, using algorithmic fallback. Error:", genAiError);
-            return NextResponse.json(generateFallbackRecommendations(student));
-        }
-
-    } catch (error: unknown) {
-        console.error("General Error in recommendations route:", error);
-        return NextResponse.json(
-            { error: "Failed to generate AI recommendations", details: error instanceof Error ? error.message : String(error) },
-            { status: 500 }
-        );
+        return NextResponse.json(merged);
+    } catch (error) {
+        console.error("AI recommendations failure:", error);
+        return NextResponse.json({ error: "Service unavailable" }, { status: 500 });
     }
 }

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, ArrowLeft } from "lucide-react";
 import { saveSemesterData } from "@/lib/firestore";
 import {
     Select,
@@ -171,16 +171,24 @@ export default function AcademicRecordsSetupPage() {
     if (semesters.length === 0) return <div className="p-8 text-center">Loading academic setup...</div>;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+        <div className="space-y-6 animate-in fade-in duration-500 pb-10">
             {/* ── Hero Header ── */}
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 shadow-xl p-7 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
                 <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/50 mb-1">Student Intelligence Portal</p>
-                        <h1 className="text-3xl font-black mb-2 tracking-tight">Academic Records Setup 📝</h1>
-                        <p className="text-white/60 font-medium text-sm">Initialize your academic profile and verify your semester performance.</p>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => router.back()} 
+                            className="text-white/80 hover:text-white hover:bg-white/10 mb-2 -ml-2"
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                        </Button>
+                        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/80 mb-1">Student Intelligence Portal</p>
+                        <h1 className="text-3xl font-black mb-2 tracking-tight leading-[1.15] pb-1">Academic Records Setup 📝</h1>
+                        <p className="text-white/85 font-medium text-sm">Initialize your academic profile and verify your semester performance.</p>
                     </div>
                     <Button onClick={handleSaveAll} disabled={isLoading} size="lg" className="bg-white/10 hover:bg-white/20 border-white/20 text-white font-black uppercase tracking-widest backdrop-blur-md shadow-2xl">
                         {isLoading ? "Saving..." : "Save & Finish Setup"}
@@ -320,3 +328,6 @@ export default function AcademicRecordsSetupPage() {
         </div>
     );
 }
+
+
+

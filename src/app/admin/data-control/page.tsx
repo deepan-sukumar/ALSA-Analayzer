@@ -290,7 +290,7 @@ export default function AdminDataControl() {
     };
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700 pb-12">
+        <div className="space-y-6 animate-in fade-in duration-700 pb-12">
             {/* Premium Data Engine Hero */}
             <div className="relative rounded-[48px] overflow-hidden bg-slate-950 border border-white/5 shadow-3xl group">
                 {/* Visual Background Elements */}
@@ -298,7 +298,7 @@ export default function AdminDataControl() {
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] mix-blend-overlay" />
 
                 <div className="relative z-10 p-12 md:p-16 flex flex-col lg:flex-row justify-between items-center gap-12">
-                    <div className="max-w-3xl space-y-8">
+                    <div className="max-w-3xl space-y-6">
                         <div className="inline-flex items-center gap-3 px-4 py-2 bg-blue-500/10 rounded-full border border-blue-500/20 backdrop-blur-md">
                             <Database className="h-3.5 w-3.5 text-blue-400" />
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-300">Core Engine Control</span>
@@ -574,3 +574,4 @@ export default function AdminDataControl() {
         </div>
     );
 }
+
