@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     // The main routing logic is handled heavily on the client components (layout.tsx, auth-context.tsx) 
     // due to the use of Firebase client Auth state.
     // However, we can add some basic matching blocks to ensure basic path separation.
