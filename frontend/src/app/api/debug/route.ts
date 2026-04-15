@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import * as admin from "firebase-admin";
-import { calculatePRI } from "@/lib/placement-calculations";
+import { calculatePRI } from "@/lib/calculations/placement-calculations";
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -41,3 +41,4 @@ export async function GET() {
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
+

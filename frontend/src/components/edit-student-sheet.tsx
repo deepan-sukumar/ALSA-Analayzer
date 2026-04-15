@@ -9,8 +9,8 @@ import { User, Mail, GraduationCap, Phone, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { updateStudent } from "@/lib/firestore";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { updateStudent } from "@/lib/firebase/firestore";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 
 const ALL_DEPARTMENTS = [...IT_DEPARTMENTS, ...CORE_DEPARTMENTS].sort();
 
@@ -253,3 +253,4 @@ export function EditStudentSheet({ open, onOpenChange, student }: EditStudentShe
         </Sheet>
     );
 }
+

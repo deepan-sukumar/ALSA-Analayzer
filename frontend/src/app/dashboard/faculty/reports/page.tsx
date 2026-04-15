@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
-import { onFacultyStudentsSnapshot } from "@/lib/firestore";
-import { calculatePRI } from "@/lib/placement-calculations";
+import { onFacultyStudentsSnapshot } from "@/lib/firebase/firestore";
+import { calculatePRI } from "@/lib/calculations/placement-calculations";
 import {
     FileText,
     Download,
@@ -451,4 +451,5 @@ export default function FacultyReportsPage() {
         </div>
     );
 }
+
 

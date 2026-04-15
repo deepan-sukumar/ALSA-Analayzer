@@ -1,9 +1,9 @@
 "use client";
 
 import React, { ReactNode } from "react";
-import { logSystemIssue } from "@/lib/issue-logger";
+import { logSystemIssue } from "@/lib/firebase/issue-logger";
 import { toast } from "sonner";
-import { UserRole } from "@/lib/issue-logger";
+import { UserRole } from "@/lib/firebase/issue-logger";
 
 interface Props {
     children: ReactNode;
@@ -88,3 +88,4 @@ export class GlobalErrorBoundary extends React.Component<Props, State> {
         return this.props.children;
     }
 }
+

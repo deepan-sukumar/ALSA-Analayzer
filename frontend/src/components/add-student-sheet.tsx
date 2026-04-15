@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { User, Mail, GraduationCap, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { addStudent, checkStudentExists } from "@/lib/firestore";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { addStudent, checkStudentExists } from "@/lib/firebase/firestore";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 
 const ALL_DEPARTMENTS = [...IT_DEPARTMENTS, ...CORE_DEPARTMENTS].sort();
 
@@ -213,3 +213,4 @@ export function AddStudentSheet({ open, onOpenChange, onAddStudent }: AddStudent
         </Sheet>
     );
 }
+

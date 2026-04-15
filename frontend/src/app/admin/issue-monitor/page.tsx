@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { collection, query, onSnapshot, updateDoc, doc, deleteDoc, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { toast } from "sonner";
 import {
     AlertCircle,
@@ -470,4 +470,5 @@ export default function AdminIssueMonitor() {
 
 // Mock items to satisfy linter if needed, though they should be imported correctly from lucide
 // UserCircle is imported, Globe is imported.
+
 

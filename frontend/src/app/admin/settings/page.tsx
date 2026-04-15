@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
     Loader2,
@@ -355,4 +355,5 @@ export default function AdminSettings() {
         </div>
     );
 }
+
 

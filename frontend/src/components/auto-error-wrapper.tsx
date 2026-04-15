@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { logSystemIssue } from "@/lib/issue-logger";
+import { logSystemIssue } from "@/lib/firebase/issue-logger";
 import { toast } from "sonner";
-import { UserRole } from "@/lib/issue-logger";
+import { UserRole } from "@/lib/firebase/issue-logger";
 import { GlobalErrorBoundary } from "./global-error-boundary";
 
 interface AutoErrorWrapperProps {
@@ -80,3 +80,4 @@ export function AutoErrorWrapper({ children, user }: AutoErrorWrapperProps) {
         </GlobalErrorBoundary>
     );
 }
+

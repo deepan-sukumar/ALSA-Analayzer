@@ -43,3 +43,4 @@ export default function AdminLayout({
 
     return <AppLayout user={user}>{children}</AppLayout>;
 }
+

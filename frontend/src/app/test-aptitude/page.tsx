@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPlacementReadiness, APTITUDE_TOPICS } from "@/lib/placement-calculations";
+import { getPlacementReadiness, APTITUDE_TOPICS } from "@/lib/calculations/placement-calculations";
 import { User, PlacementMetrics } from "@/types";
 
 export default function TestAptitudePage() {
@@ -127,3 +127,4 @@ export default function TestAptitudePage() {
         </div>
     );
 }
+

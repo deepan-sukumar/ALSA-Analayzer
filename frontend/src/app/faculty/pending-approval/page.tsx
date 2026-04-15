@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Clock, LogOut, GraduationCap, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { updateUserDocument } from "@/lib/firestore";
+import { updateUserDocument } from "@/lib/firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 
 export default function PendingApprovalPage() {
     const { user, logout, isLoading } = useAuth();
@@ -121,3 +121,4 @@ export default function PendingApprovalPage() {
         </div>
     );
 }
+

@@ -55,3 +55,4 @@ export default function DashboardLayout({
 
     return <AppLayout user={user}>{children}</AppLayout>;
 }
+

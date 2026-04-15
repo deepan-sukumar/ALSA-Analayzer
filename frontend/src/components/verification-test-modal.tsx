@@ -4,13 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
 import { AlertCircle, Maximize, Clock, ShieldAlert, Loader2, Lock, UserCheck } from "lucide-react";
 import { CoreTopicSelection } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { normalizeDepartment } from "@/lib/department-core";
+import { normalizeDepartment } from "@/lib/core/department-core";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Question {
@@ -775,4 +775,5 @@ function generateMockQuestions(topics: string[]) {
         };
     });
 }
+
 

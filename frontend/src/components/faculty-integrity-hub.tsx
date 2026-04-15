@@ -14,15 +14,15 @@ import {
     limit,
     getDocs
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { normalizeDepartment } from "@/lib/department-core";
-import { CORE_ACADEMIC_TOPICS } from "@/lib/core-topics";
-import { ROLE_SKILL_MATRIX } from "@/lib/role-skills";
+import { normalizeDepartment } from "@/lib/core/department-core";
+import { CORE_ACADEMIC_TOPICS } from "@/lib/core/core-topics";
+import { ROLE_SKILL_MATRIX } from "@/lib/core/role-skills";
 import {
     CheckCircle2,
     ShieldAlert,
@@ -552,3 +552,4 @@ export function FacultyIntegrityHub() {
         </Card>
     );
 }
+

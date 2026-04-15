@@ -43,10 +43,10 @@ import {
     RefreshCw
 } from "lucide-react";
 import { collection, onSnapshot, query } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { toast } from "sonner";
 import { User as AppUser } from "@/types";
-import { deleteUserCompletely, updateUserDocument } from "@/lib/firestore";
+import { deleteUserCompletely, updateUserDocument } from "@/lib/firebase/firestore";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -378,4 +378,5 @@ export default function UserManagementPage() {
         </div>
     );
 }
+
 

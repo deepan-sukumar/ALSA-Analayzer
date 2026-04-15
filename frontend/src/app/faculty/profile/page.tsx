@@ -9,10 +9,10 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/app-layout";
 import { useState } from "react";
-import { updateFacultyProfile } from "@/lib/firestore";
+import { updateFacultyProfile } from "@/lib/firebase/firestore";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { normalizeDepartment } from "@/lib/department-core";
+import { normalizeDepartment } from "@/lib/core/department-core";
 
 export default function StandaloneFacultyProfilePage() {
     const { user } = useAuth();
@@ -169,3 +169,4 @@ export default function StandaloneFacultyProfilePage() {
         </AppLayout>
     );
 }
+

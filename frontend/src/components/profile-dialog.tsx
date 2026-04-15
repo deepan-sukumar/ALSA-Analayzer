@@ -24,7 +24,7 @@ import {
 import { useAuth } from "@/context/auth-context";
 import { User, Mail, Shield, GraduationCap, Building2, Pencil, Save, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 
 const ALL_DEPARTMENTS = [...IT_DEPARTMENTS, ...CORE_DEPARTMENTS].sort();
 
@@ -337,3 +337,4 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         </Dialog>
     );
 }
+

@@ -14,11 +14,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { User as AppUser } from "@/types";
 import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { toast } from "sonner";
 import { Check, X, Loader2, ShieldCheck, UserPlus, Building2, Mail, Briefcase } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
-import { deleteUserCompletely } from "@/lib/firestore";
+import { deleteUserCompletely } from "@/lib/firebase/firestore";
 
 export default function FacultyApprovalsPage() {
     const [faculty, setFaculty] = useState<AppUser[]>([]);
@@ -215,4 +215,5 @@ export default function FacultyApprovalsPage() {
         </div>
     );
 }
+
 

@@ -28,10 +28,10 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { calculateReadinessScore, getRiskLevel } from "@/lib/faculty-logic";
+import { calculateReadinessScore, getRiskLevel } from "@/lib/faculty/faculty-logic";
 import { useEffect, useState } from "react";
 import { doc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -739,3 +739,4 @@ export function StudentDetailsSheet({ student, open, onOpenChange, onDeleteSucce
         </Sheet>
     );
 }
+
