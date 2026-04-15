@@ -247,3 +247,4 @@ export function getRolesForDepartment(dept: string): PlacementRole[] {
     // Fallback: return all roles
     return [...PLACEMENT_ROLES];
 }
+

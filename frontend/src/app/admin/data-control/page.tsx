@@ -230,7 +230,6 @@ export default function AdminDataControl() {
             const snap = await getDocs(usersRef);
             let updateCount = 0;
             const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
-            const { normalizeDepartment } = await import("@/lib/core/department-core");
 
             snap.forEach(docSnap => {
                 const data = docSnap.data();

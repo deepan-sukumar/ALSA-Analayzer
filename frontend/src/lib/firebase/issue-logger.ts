@@ -1,5 +1,5 @@
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueStatus = "open" | "resolved";
@@ -62,3 +62,4 @@ export async function logSystemIssue(params: LogIssueParams): Promise<void> {
         console.error("Critical Failure: Unable to log system issue to datastore.", e);
     }
 }
+

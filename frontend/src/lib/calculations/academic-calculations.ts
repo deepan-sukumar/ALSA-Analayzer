@@ -6,9 +6,9 @@ import {
     OutcomeAlignment,
     AcademicOutcomeIndex
 } from "@/types";
-import { PLACEMENT_ROLES, ROLE_SKILL_MATRIX, PlacementRole } from "@/lib/role-skills";
-import { getCoreSubjects } from "@/lib/department-core";
-import { CORE_ACADEMIC_TOPICS } from "@/lib/core-topics";
+import { PLACEMENT_ROLES, ROLE_SKILL_MATRIX, PlacementRole } from "@/lib/core/role-skills";
+import { getCoreSubjects } from "@/lib/core/department-core";
+import { CORE_ACADEMIC_TOPICS } from "@/lib/core/core-topics";
 
 // -------------------------------------------------------------
 // 1. ACADEMIC ENRICHMENT SCORE (Unified version)
@@ -304,3 +304,4 @@ function determineAcademicRisk(
 
     return risks;
 }
+

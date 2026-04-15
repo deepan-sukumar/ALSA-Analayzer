@@ -158,3 +158,4 @@ export function getCoreSubjects(dept: string): string[] {
 
     return DEPARTMENT_CORE_SUBJECTS["Mechanical Engineering"]; // Ultimate fallback
 }
+
