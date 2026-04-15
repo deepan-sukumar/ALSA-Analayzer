@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import {
     LayoutDashboard,
     Users,
@@ -231,7 +231,7 @@ export function Sidebar({ className, role: propRole, isMobile }: SidebarProps) {
 
     if (isMobile) {
         return (
-            <div className={cn("pb-12 h-screen flex flex-col justify-between bg-background border-r border-slate-200 dark:border-slate-800/60", className)}>
+            <div className={cn("flex h-screen flex-col justify-between overflow-y-auto bg-slate-950 text-white border-r border-slate-800/60 pb-8", className)}>
                 <div className="space-y-4 py-4">
                     <div className="px-4 py-2">
                         <div className="flex items-center gap-3 px-2 mb-8">
@@ -257,7 +257,7 @@ export function Sidebar({ className, role: propRole, isMobile }: SidebarProps) {
                                         className={cn(
                                             "group flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200",
                                             isActive
-                                                ? accent.active
+                                                ? "bg-white/10 text-white"
                                                 : "text-slate-400 hover:text-white hover:bg-slate-800/60"
                                         )}
                                     >
@@ -477,3 +477,4 @@ export function Sidebar({ className, role: propRole, isMobile }: SidebarProps) {
         </div>
     );
 }
+

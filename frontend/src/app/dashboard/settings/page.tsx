@@ -18,9 +18,9 @@ import {
 import { Moon, Sun, Laptop, User, Building2, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
-import { getAllStudents } from "@/lib/firestore";
-import { calculatePRI } from "@/lib/placement-calculations";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
+import { getAllStudents } from "@/lib/firebase/firestore";
+import { calculatePRI } from "@/lib/calculations/placement-calculations";
 import { User as AppUser } from "@/types";
 
 export default function SettingsPage() {
@@ -181,7 +181,7 @@ export default function SettingsPage() {
                                 <CardTitle className="text-indigo-900 dark:text-indigo-100">Academic Mapping Stats</CardTitle>
                                 <CardDescription className="text-indigo-700/70 dark:text-indigo-300/70">Your current department-level engagement metrics.</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-6 relative z-10">
+                            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative z-10">
                                 <div className="p-6 rounded-2xl border border-white/50 dark:border-white/10 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm">
                                     <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">Students Mentored</p>
                                     <p className="text-4xl font-black text-slate-800 dark:text-white">{facultyStats.total}</p>
@@ -261,4 +261,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
 

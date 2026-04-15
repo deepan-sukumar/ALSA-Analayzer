@@ -7,11 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { GraduationCap, Users, ArrowRight, Loader2, BookOpen, Briefcase, Sparkles } from "lucide-react";
-import { createUserDocument } from "@/lib/firestore";
-import { auth, db } from "@/lib/firebase";
+import { createUserDocument } from "@/lib/firebase/firestore";
+import { auth, db } from "@/lib/firebase/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -110,7 +110,7 @@ export default function SelectRolePage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 font-sans selection:bg-blue-100 dark:selection:bg-blue-900">
+        <div className="min-h-screen flex items-center justify-center overflow-x-hidden bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 font-sans selection:bg-blue-100 dark:selection:bg-blue-900">
             {/* Background elements */}
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-5 mix-blend-overlay pointer-events-none"></div>
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
@@ -119,7 +119,7 @@ export default function SelectRolePage() {
             <Card className="w-full max-w-4xl shadow-2xl border-slate-300 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl overflow-hidden animate-in fade-in zoom-in duration-500">
                 <div className="grid md:grid-cols-5 h-full">
                     {/* Left Panel - Branding */}
-                    <div className="md:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-8 text-white relative overflow-hidden flex flex-col justify-between">
+                    <div className="md:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between">
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_70%)] opacity-50"></div>
                         <div className="relative z-10">
                             <div className="h-12 w-12 bg-white/10 rounded-xl backdrop-blur-md border border-white/20 flex items-center justify-center mb-6">
@@ -154,7 +154,7 @@ export default function SelectRolePage() {
                     </div>
 
                     {/* Right Panel - Form */}
-                    <div className="md:col-span-3 p-8 md:p-10 flex flex-col justify-center">
+                    <div className="md:col-span-3 p-5 sm:p-6 md:p-10 flex flex-col justify-center">
                         <div className="max-w-md mx-auto w-full space-y-8">
                             <div className="space-y-2">
                                 <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Final Step, {auth.currentUser?.displayName?.split(" ")[0] || "User"}</h1>
@@ -185,7 +185,7 @@ export default function SelectRolePage() {
                                         <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                                             Primary Role
                                         </Label>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <button
                                                 type="button"
                                                 onClick={() => setSelectedRole("student")}
@@ -274,3 +274,4 @@ export default function SelectRolePage() {
         </div>
     );
 }
+

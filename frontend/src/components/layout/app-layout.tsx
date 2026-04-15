@@ -14,16 +14,16 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children, user }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen overflow-x-hidden bg-background">
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <Sidebar role={user?.role} />
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col md:ml-[68px]">
+      <div className="flex min-w-0 flex-1 flex-col md:ml-[68px]">
         <Header />
-        <main className="flex-1 space-y-4 p-8 pt-6">
+        <main className="flex-1 space-y-4 overflow-x-hidden px-3 py-4 sm:px-4 md:px-6 md:py-6 lg:px-8">
           <AutoErrorWrapper user={user}>
             {children}
           </AutoErrorWrapper>
@@ -32,3 +32,4 @@ export default function AppLayout({ children, user }: AppLayoutProps) {
     </div>
   );
 }
+

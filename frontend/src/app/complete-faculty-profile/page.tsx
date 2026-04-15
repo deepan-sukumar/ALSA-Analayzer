@@ -14,7 +14,7 @@ import {
     CheckCircle2,
     ArrowRight
 } from "lucide-react";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 import {
     Select,
     SelectContent,
@@ -85,12 +85,12 @@ export default function CompleteFacultyProfilePage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 font-sans">
+        <div className="min-h-screen flex items-center justify-center overflow-x-hidden bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 font-sans">
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none"></div>
             <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none"></div>
 
             <Card className="w-full max-w-lg shadow-2xl border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl animate-in fade-in zoom-in duration-500">
-                <div className="bg-slate-900 p-6 flex items-center gap-4 rounded-t-xl">
+                <div className="bg-slate-900 p-4 sm:p-6 flex items-center gap-4 rounded-t-xl">
                     <div className="h-12 w-12 bg-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                         <Sparkles className="h-6 w-6 text-white" />
                     </div>
@@ -100,7 +100,7 @@ export default function CompleteFacultyProfilePage() {
                     </div>
                 </div>
 
-                <CardHeader className="p-8 pb-4">
+                <CardHeader className="p-5 pb-4 sm:p-8 sm:pb-4">
                     <CardTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
                         <Briefcase className="h-6 w-6 text-blue-500" /> Professional Info
                     </CardTitle>
@@ -109,7 +109,7 @@ export default function CompleteFacultyProfilePage() {
                     </CardDescription>
                 </CardHeader>
 
-                <CardContent className="p-8 pt-0">
+                <CardContent className="p-5 pt-0 sm:p-8 sm:pt-0">
                     <form onSubmit={handleSubmit} className="space-y-8">
                         <div className="space-y-6">
                             {/* Department Selection */}
@@ -178,3 +178,4 @@ export default function CompleteFacultyProfilePage() {
         </div>
     );
 }
+

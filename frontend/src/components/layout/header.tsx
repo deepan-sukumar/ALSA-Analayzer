@@ -38,7 +38,7 @@ export function Header() {
     const isDark = theme === "dark";
 
     return (
-        <header className="relative z-30 flex h-16 items-center gap-4 bg-transparent px-6 shadow-none">
+        <header className="relative z-30 flex min-h-16 items-center gap-3 bg-transparent px-3 py-2 sm:px-4 md:px-6 shadow-none">
             <Sheet>
                 <SheetTrigger asChild>
                     <Button variant="outline" size="icon" className="md:hidden">
@@ -62,13 +62,13 @@ export function Header() {
                 </SheetContent>
             </Sheet>
 
-            <div className="flex w-full justify-end items-center gap-3">
+            <div className="flex min-w-0 w-full items-center justify-end gap-2 sm:gap-3">
 
                 {/* ── Theme Toggle ── */}
                 <button
                     onClick={() => setTheme(isDark ? "light" : "dark")}
                     className={`
-                        group relative flex items-center gap-2 px-3.5 py-2 rounded-xl border font-bold text-xs
+                        group relative flex items-center gap-2 px-2.5 py-2 sm:px-3.5 rounded-xl border font-bold text-xs
                         transition-all duration-300 select-none
                         ${isDark
                             ? "bg-slate-800 border-slate-700 text-yellow-300 hover:bg-slate-700 hover:border-slate-600 shadow-inner"
@@ -92,7 +92,7 @@ export function Header() {
 
                 {/* ── User Profile ── */}
                 <div className="flex items-center gap-2">
-                    <div className="text-right hidden sm:block">
+                    <div className="text-right hidden md:block">
                         <p className="text-sm font-bold leading-none text-foreground">{userName}</p>
                         <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">{userRole}</p>
                     </div>
@@ -136,3 +136,4 @@ export function Header() {
         </header>
     );
 }
+

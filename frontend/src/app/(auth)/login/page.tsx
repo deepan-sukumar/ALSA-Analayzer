@@ -52,9 +52,9 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-[100dvh] flex bg-white">
+        <div className="min-h-[100dvh] flex bg-white overflow-x-hidden">
             {/* ── Left Branding Panel ── */}
-            <div className="hidden lg:flex flex-col justify-between w-[46%] xl:w-[42%] relative overflow-hidden p-12 bg-gradient-to-br from-violet-600 via-indigo-600 to-indigo-800">
+            <div className="hidden lg:flex flex-col justify-between w-[46%] xl:w-[42%] relative overflow-hidden p-8 xl:p-12 bg-gradient-to-br from-violet-600 via-indigo-600 to-indigo-800">
                 {/* Subtle inner light */}
                 <div className="absolute top-0 right-0 w-[60%] h-[50%] rounded-full bg-white/10 blur-[100px] pointer-events-none" />
                 <div className="absolute bottom-0 left-0 w-[50%] h-[40%] rounded-full bg-indigo-900/30 blur-[80px] pointer-events-none" />
@@ -80,7 +80,7 @@ export default function LoginPage() {
                             ALSA transforms complex academic data into clear, actionable placement insights.
                         </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                         {HIGHLIGHTS.map((h) => (
                             <div key={h.text} className="flex items-center gap-2.5 bg-white/10 border border-white/15 rounded-xl px-4 py-3">
                                 <h.icon className="h-4 w-4 text-white/80 shrink-0" />
@@ -96,29 +96,29 @@ export default function LoginPage() {
             </div>
 
             {/* ── Right Form Panel ── */}
-            <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 sm:px-12 bg-white relative">
+            <div className="relative flex flex-1 flex-col items-center justify-center bg-white px-4 py-20 sm:px-6 sm:py-12 md:px-10 lg:px-12">
                 {/* Mobile back */}
-                <div className="lg:hidden absolute top-6 left-6">
+                <div className="lg:hidden absolute top-4 left-4 sm:top-6 sm:left-6">
                     <Link href="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-700 text-sm font-medium transition-colors">
                         <ArrowLeft className="h-4 w-4" />Home
                     </Link>
                 </div>
 
-                <div className="w-full max-w-sm space-y-7 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-7 animate-in fade-in slide-in-from-bottom-6 duration-700">
                     <div className="space-y-1.5">
                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Welcome back</h1>
                         <p className="text-slate-400 text-sm">Sign in to your ALSA account</p>
                     </div>
 
                     {/* Role toggle */}
-                    <div className="flex p-1 gap-1 rounded-2xl bg-slate-100 border-2 border-slate-300">
+                    <div className="flex flex-wrap p-1 gap-1 rounded-2xl bg-slate-100 border-2 border-slate-300">
                         {(["student", "faculty"] as const).map((r) => (
                             <button key={r} onClick={() => {
                                 setRole(r);
                                 localStorage.setItem("alsa_preferred_role", r);
                             }}
                                 suppressHydrationWarning
-                                className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-semibold transition-all duration-300 ${role === r
+                                className={`min-w-0 flex-1 flex items-center justify-center gap-2 h-10 rounded-xl px-2 text-sm font-semibold transition-all duration-300 ${role === r
                                     ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md"
                                     : "text-slate-500 hover:text-slate-700"}`}>
                                 {r === "student" ? <GraduationCap className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
@@ -191,3 +191,4 @@ export default function LoginPage() {
         </div>
     );
 }
+

@@ -281,15 +281,15 @@ export default function FacultyDashboard() {
         : "from-slate-500 to-slate-700";
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 px-1">
+        <div className="space-y-8 animate-in fade-in duration-500">
 
             {/* ── Page Header ── */}
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 shadow-xl p-7">
+            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 shadow-xl p-5 sm:p-6 md:p-7">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
                 <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
                 <div className="relative z-10">
                     <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/50 mb-1">Faculty Intelligence Portal</p>
-                    <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Professional Readiness Analytics</h1>
+                    <h1 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">Professional Readiness Analytics</h1>
                     <p className="text-white/60 font-medium text-sm">
                         Cohort evaluation &amp; risk monitoring — <span className="text-white/90 font-bold">{facultyUser?.department}</span>
                     </p>
@@ -308,7 +308,7 @@ export default function FacultyDashboard() {
             ) : (
                 <div className="space-y-8">
                     {/* ── KPI Grid ── */}
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                             <KpiCard
                                 title="Total Students"
                                 value={analytics.totalStudents}

@@ -14,7 +14,7 @@ import {
     GraduationCap, BookOpen, User, Mail, Lock, ArrowRight, ArrowLeft, CheckCircle2, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 
 const STEPS = ["Role", "Account", "Details"];
 
@@ -101,9 +101,9 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="min-h-[100dvh] flex bg-white">
+        <div className="min-h-[100dvh] flex bg-white overflow-x-hidden">
             {/* ── Left Branding Panel ── */}
-            <div className="hidden lg:flex flex-col justify-between w-[40%] xl:w-[36%] relative overflow-hidden p-12 bg-gradient-to-br from-violet-600 via-indigo-600 to-indigo-800">
+            <div className="hidden lg:flex flex-col justify-between w-[40%] xl:w-[36%] relative overflow-hidden p-8 xl:p-12 bg-gradient-to-br from-violet-600 via-indigo-600 to-indigo-800">
                 <div className="absolute top-0 right-0 w-[60%] h-[50%] rounded-full bg-white/10 blur-[100px] pointer-events-none" />
                 <div className="absolute bottom-0 left-0 w-[50%] h-[40%] rounded-full bg-indigo-900/30 blur-[80px] pointer-events-none" />
                 <div className="absolute inset-0 pointer-events-none opacity-[0.12]"
@@ -147,9 +147,9 @@ export default function SignupPage() {
             </div>
 
             {/* ── Right Form Panel ── */}
-            <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 sm:px-12 bg-white relative">
+            <div className="relative flex flex-1 flex-col items-center justify-center bg-white px-4 py-20 sm:px-6 sm:py-12 md:px-10 lg:px-12">
                 {/* Mobile top bar */}
-                <div className="lg:hidden absolute top-6 left-6 right-6 flex items-center justify-between">
+                <div className="lg:hidden absolute top-4 left-4 right-4 sm:top-6 sm:left-6 sm:right-6 flex items-center justify-between gap-3">
                     <Link href="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-700 text-sm font-medium transition-colors">
                         <ArrowLeft className="h-4 w-4" />Home
                     </Link>
@@ -160,7 +160,7 @@ export default function SignupPage() {
                     </div>
                 </div>
 
-                <div className="w-full max-w-sm space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                <div className="w-full max-w-sm sm:max-w-md space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
                     {/* Step header */}
                     <div className="space-y-1">
                         <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-600">Step {step} of 3</p>
@@ -179,7 +179,7 @@ export default function SignupPage() {
                     {/* ── Step 1: Role ── */}
                     {step === 1 && (
                         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {(["student", "faculty"] as const).map((r) => {
                                     const Icon = r === "student" ? GraduationCap : BookOpen;
                                     const isActive = role === r;
@@ -255,7 +255,7 @@ export default function SignupPage() {
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gender</Label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {(["male", "female"] as const).map((g) => (
                                         <button key={g} type="button" onClick={() => setGender(g)}
                                             className={`h-11 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-semibold transition-all duration-300 shadow-sm ${gender === g
@@ -310,7 +310,7 @@ export default function SignupPage() {
                             </div>
 
                             {role === "student" ? (
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">CGPA</Label>
                                         <Input id="cgpa" placeholder="e.g. 8.5" type="number" step="0.01" value={formData.cgpa} onChange={handleInputChange}
@@ -370,3 +370,4 @@ export default function SignupPage() {
         </div>
     );
 }
+

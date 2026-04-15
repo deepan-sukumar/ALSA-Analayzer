@@ -23,7 +23,7 @@ import {
     Check,
     Loader2
 } from "lucide-react";
-import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/department-core";
+import { IT_DEPARTMENTS, CORE_DEPARTMENTS } from "@/lib/core/department-core";
 import {
     Select,
     SelectContent,
@@ -182,14 +182,14 @@ export default function CompleteProfilePage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 font-sans">
+        <div className="min-h-screen flex items-center justify-center overflow-x-hidden bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 font-sans">
             {/* Background Decor */}
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 dark:bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
 
             <Card className="w-full max-w-xl shadow-2xl border-slate-300 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl relative overflow-hidden animate-in fade-in zoom-in duration-500">
                 {/* Visual Step Indicator Header */}
-                <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 flex items-center justify-between border-b border-slate-700">
+                <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-4 sm:p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-700">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                             <Sparkles className="h-5 w-5 text-white" />
@@ -210,7 +210,7 @@ export default function CompleteProfilePage() {
                     </div>
                 </div>
 
-                <CardHeader className="pt-8 px-8 pb-4">
+                <CardHeader className="px-5 pt-6 pb-4 sm:px-8 sm:pt-8">
                     <CardTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
                         {step === 1 ? (
                             <><UserCircle2 className="h-6 w-6 text-blue-500" /> Basic Details</>
@@ -226,14 +226,14 @@ export default function CompleteProfilePage() {
                     </CardDescription>
                 </CardHeader>
 
-                <CardContent className="px-8 pb-8">
+                <CardContent className="px-5 pb-6 sm:px-8 sm:pb-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {step === 1 && (
                             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-500">
                                 {/* Gender Selection Premium */}
                                 <div className="space-y-3">
                                     <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Select Gender</Label>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <button
                                             type="button"
                                             onClick={() => handleChange("gender", "male")}
@@ -357,7 +357,7 @@ export default function CompleteProfilePage() {
                                     </Select>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Current CGPA</Label>
                                         <Input
@@ -381,7 +381,7 @@ export default function CompleteProfilePage() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Year of Study</Label>
                                         <Select value={formData.yearOfStudy} onValueChange={(val) => handleChange("yearOfStudy", val)}>
@@ -408,7 +408,7 @@ export default function CompleteProfilePage() {
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4 pt-4">
+                                <div className="flex flex-col-reverse sm:flex-row gap-4 pt-4">
                                     <Button type="button" variant="outline" onClick={handleBack} className="h-12 flex-1 rounded-xl border-slate-300 dark:border-slate-800 font-black uppercase tracking-widest text-xs">
                                         <ArrowLeft className="mr-2 h-4 w-4" /> Back
                                     </Button>
@@ -424,3 +424,4 @@ export default function CompleteProfilePage() {
         </div >
     );
 }
+
