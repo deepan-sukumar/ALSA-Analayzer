@@ -154,7 +154,7 @@ export interface PlacementReadiness {
     standingArrears: number;
 
     // Backward compatibility & Extended Metrics
-    finalRisk?: { label: "Ready" | "Moderate" | "High" | "Critical", index: number };
+    finalRisk?: { label: "Low" | "Moderate" | "High" | "Critical", index: number };
     recommendedRole?: string;
 
     gaps: Gap[];
@@ -290,3 +290,4 @@ export interface NavItem {
     icon: React.ComponentType<{ className?: string }>;
     variant: "default" | "ghost";
 }
+

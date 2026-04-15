@@ -179,7 +179,7 @@ export default function DevelopmentAnalyticsPage() {
             case "Critical": return "text-red-700 dark:text-red-400";
             case "High": return "text-red-600 dark:text-red-400";
             case "Moderate": return "text-yellow-600 dark:text-yellow-400";
-            case "Ready": return "text-blue-600 dark:text-blue-400";
+            case "Low": return "text-blue-600 dark:text-blue-400";
             default: return "text-green-600 dark:text-green-400";
         }
     };
@@ -259,7 +259,7 @@ export default function DevelopmentAnalyticsPage() {
                 </Card>
 
                 <Card className="border border-slate-200/60 dark:border-slate-800/60 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl overflow-hidden relative group hover:shadow-2xl transition-all duration-500 hover:-translate-y-1">
-                    <div className={cn("absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b rounded-l-xl", readinessLevel === "Critical" ? "from-red-500 to-red-700" : readinessLevel === "High" ? "from-red-400 to-red-600" : readinessLevel === "Moderate" ? "from-amber-400 to-amber-600" : readinessLevel === "Ready" ? "from-blue-400 to-blue-600" : "from-emerald-400 to-emerald-600")} />
+                    <div className={cn("absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b rounded-l-xl", readinessLevel === "Critical" ? "from-red-500 to-red-700" : readinessLevel === "High" ? "from-red-400 to-red-600" : readinessLevel === "Moderate" ? "from-amber-400 to-amber-600" : readinessLevel === "Low" ? "from-blue-400 to-blue-600" : "from-emerald-400 to-emerald-600")} />
                     <CardHeader className="pb-2">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600 dark:text-indigo-400">

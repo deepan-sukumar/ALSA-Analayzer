@@ -508,8 +508,9 @@ function generateOverallDrawbacks(student: any): DrawbackItem[] {
         });
     }
 
-    if (enrichmentBreakdown?.missing?.length > 0) {
-        enrichmentBreakdown.missing.forEach((category: string) => {
+    const missingEnrichmentCategories = enrichmentBreakdown?.missing ?? [];
+    if (missingEnrichmentCategories.length > 0) {
+        missingEnrichmentCategories.forEach((category: string) => {
             addUnique({
                 drawback: `${category} is missing from your current overall profile evidence.`,
                 suggestion: `Add at least one ${category.toLowerCase()}-based activity or achievement so your portal profile reflects broader development.`,
