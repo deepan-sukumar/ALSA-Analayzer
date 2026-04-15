@@ -36,13 +36,54 @@ import {
     Area
 } from "recharts";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { calculatePRI } from "@/lib/placement-calculations";
+import { db } from "@/lib/firebase/firebase";
+import { calculatePRI } from "@/lib/calculations/placement-calculations";
 import { User } from "@/types";
+import { normalizeDepartment } from "@/lib/core/department-core";
 
 const CHART_AXIS_COLOR = "hsl(var(--muted-foreground))";
 const CHART_GRID_COLOR = "hsl(var(--border))";
 const CHART_LABEL_COLOR = "hsl(var(--foreground))";
+
+const parseTimestamp = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") return value.toDate();
+    if (typeof value?.seconds === "number") return new Date(value.seconds * 1000);
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatBucketLabel = (date: Date) =>
+    date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+
+const buildGrowthTrend = (students: User[]) => {
+    const monthly = new Map<string, { monthDate: Date; students: number; priTotal: number }>();
+
+    students.forEach((student, index) => {
+        const sourceDate =
+            parseTimestamp((student as any).createdAt) ||
+            parseTimestamp((student as any).updatedAt) ||
+            parseTimestamp(student.lastUpdated) ||
+            new Date(Date.now() - (students.length - index) * 86400000);
+
+        const monthDate = new Date(sourceDate.getFullYear(), sourceDate.getMonth(), 1);
+        const key = monthDate.toISOString();
+        const current = monthly.get(key) || { monthDate, students: 0, priTotal: 0 };
+        current.students += 1;
+        current.priTotal += calculatePRI(student).pri;
+        monthly.set(key, current);
+    });
+
+    return Array.from(monthly.values())
+        .sort((a, b) => a.monthDate.getTime() - b.monthDate.getTime())
+        .slice(-6)
+        .map((entry) => ({
+            week: formatBucketLabel(entry.monthDate),
+            students: entry.students,
+            pri: Math.round(entry.priTotal / Math.max(entry.students, 1)),
+        }));
+};
 
 export default function AdminSystemAnalytics() {
     const [students, setStudents] = useState<User[]>([]);
@@ -78,12 +119,7 @@ export default function AdminSystemAnalytics() {
         if (!students.length && !faculty.length) return null;
 
         const totalUsers = students.length + faculty.length;
-        const growthTrend = [
-            { week: "W1", students: Math.floor(students.length * 0.7), pri: 62 },
-            { week: "W2", students: Math.floor(students.length * 0.8), pri: 65 },
-            { week: "W3", students: Math.floor(students.length * 0.9), pri: 68 },
-            { week: "W4", students: students.length, pri: 71 },
-        ];
+        const growthTrend = buildGrowthTrend(students);
 
         const roles = {
             student: students.length,
@@ -103,7 +139,7 @@ export default function AdminSystemAnalytics() {
         students.forEach(student => {
             const pri = calculatePRI(student).pri;
             totalStudentPRI += pri;
-            const dept = student.department || "Other";
+            const dept = normalizeDepartment(student.department || "Other");
             if (!deptStats[dept]) deptStats[dept] = { totalPRI: 0, count: 0 };
             deptStats[dept].totalPRI += pri;
             deptStats[dept].count += 1;
@@ -115,8 +151,11 @@ export default function AdminSystemAnalytics() {
         })).sort((a, b) => b.avg - a.avg);
 
         const avgPRI = students.length > 0 ? Math.round(totalStudentPRI / students.length) : 0;
+        const adminCount = roles.admin;
+        const facultyCount = roles.faculty;
+        const deptCount = deptData.length;
 
-        return { totalUsers, avgPRI, growthTrend, roleData, deptData };
+        return { totalUsers, avgPRI, growthTrend, roleData, deptData, adminCount, facultyCount, deptCount };
 
     }, [students, faculty]);
 
@@ -176,7 +215,7 @@ export default function AdminSystemAnalytics() {
                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Data Latency</span>
                                 <div className="flex items-center gap-2">
                                     <Zap className="h-4 w-4 text-emerald-400" />
-                                    <span className="text-sm font-bold text-slate-200">12ms (Nominal)</span>
+                                    <span className="text-sm font-bold text-slate-200">{analytics.deptCount} Departments Tracked</span>
                                 </div>
                             </div>
                         </div>
@@ -367,9 +406,9 @@ export default function AdminSystemAnalytics() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 {[
                     { label: "Active Intelligence", val: students.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-                    { label: "Faculty Directory", val: faculty.length, icon: Target, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-                    { label: "System Uptime", val: "99.98%", icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-                    { label: "Security Status", val: "SECURE", icon: ShieldCheck, color: "text-cyan-500", bg: "bg-cyan-500/10" },
+                    { label: "Faculty Directory", val: analytics.facultyCount, icon: Target, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+                    { label: "Admin Coverage", val: analytics.adminCount, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+                    { label: "Tracked Departments", val: analytics.deptCount, icon: ShieldCheck, color: "text-cyan-500", bg: "bg-cyan-500/10" },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white dark:bg-slate-900 shadow-xl rounded-[32px] p-8 group border border-slate-100 dark:border-slate-800 transition-all duration-500 hover:scale-[1.02]">
                         <div className="flex items-center justify-between mb-6">
@@ -388,4 +427,5 @@ export default function AdminSystemAnalytics() {
         </div>
     );
 }
+
 

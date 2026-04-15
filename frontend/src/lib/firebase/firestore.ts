@@ -14,6 +14,33 @@ import {
 import { db } from "./firebase";
 import { normalizeDepartment } from "../core/department-core";
 
+const getStudentMergeKey = (record: any) =>
+    record?.registerNumber ||
+    record?.registerNo ||
+    record?.email?.toLowerCase?.() ||
+    record?.id;
+
+const mergeStudentRecords = (students: any[], users: any[]) => {
+    const merged = new Map<string, any>();
+
+    students.forEach((student) => {
+        const key = getStudentMergeKey(student);
+        if (!key) return;
+        merged.set(key, student);
+    });
+
+    users
+        .filter((user) => user.role === "student")
+        .forEach((user) => {
+            const key = getStudentMergeKey(user);
+            if (!key) return;
+            const existing = merged.get(key) || {};
+            merged.set(key, { ...existing, ...user });
+        });
+
+    return Array.from(merged.values());
+};
+
 // 🛡️ Recursive Helper to clean objects of undefined values
 const cleanObject = (obj: any): any => {
     if (obj === null || typeof obj !== 'object') return obj;
@@ -218,23 +245,51 @@ export async function getPlacementMetrics(uid: string) {
 // ──────────────────────────────────
 
 export async function getAllStudents() {
-    const q = query(collection(db, "students"));
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const [studentsSnap, usersSnap] = await Promise.all([
+        getDocs(query(collection(db, "students"))),
+        getDocs(query(collection(db, "users"), where("role", "==", "student"))),
+    ]);
+
+    const students = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    return mergeStudentRecords(students, users);
 }
 
 /**
  * Listens for real-time updates to all students.
  */
 export function onStudentsSnapshot(callback: (students: any[]) => void) {
-    const q = query(collection(db, "students"));
-    return onSnapshot(q, (snapshot) => {
-        const students = snapshot.docs.map((doc) => ({
+    const studentsQuery = query(collection(db, "students"));
+    const usersQuery = query(collection(db, "users"), where("role", "==", "student"));
+
+    let latestStudents: any[] = [];
+    let latestUsers: any[] = [];
+
+    const emitMerged = () => {
+        callback(mergeStudentRecords(latestStudents, latestUsers));
+    };
+
+    const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
+        latestStudents = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
         }));
-        callback(students);
+        emitMerged();
     });
+
+    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+        latestUsers = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+        emitMerged();
+    });
+
+    return () => {
+        unsubscribeStudents();
+        unsubscribeUsers();
+    };
 }
 
 /**
@@ -253,20 +308,7 @@ export function onDepartmentStudentsSnapshot(department: string, callback: (stud
     let latestUsers: any[] = [];
 
     const emitMerged = () => {
-        const merged = new Map<string, any>();
-
-        latestStudents.forEach((student) => {
-            merged.set(student.id, student);
-        });
-
-        latestUsers
-            .filter((user) => user.role === "student")
-            .forEach((user) => {
-                const existing = merged.get(user.id) || {};
-                merged.set(user.id, { ...existing, ...user });
-            });
-
-        callback(Array.from(merged.values()));
+        callback(mergeStudentRecords(latestStudents, latestUsers));
     };
 
     const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
@@ -308,8 +350,6 @@ export async function updateFacultyProfile(uid: string, data: Record<string, any
 }
 
 export function onFacultyStudentsSnapshot(department: string, callback: (students: any[]) => void) {
-    console.log("Initializing onFacultyStudentsSnapshot for Department:", department);
-
     // Normalize to Canonical Form
     const dept = normalizeDepartment(department);
     const studentsQuery = query(collection(db, "students"), where("department", "==", dept));
@@ -319,23 +359,7 @@ export function onFacultyStudentsSnapshot(department: string, callback: (student
     let latestUsers: any[] = [];
 
     const emitMerged = () => {
-        const merged = new Map<string, any>();
-
-        latestStudents.forEach((student) => {
-            merged.set(student.id, student);
-        });
-
-        latestUsers
-            .filter((user) => user.role === "student")
-            .forEach((user) => {
-                const existing = merged.get(user.id) || {};
-                merged.set(user.id, { ...existing, ...user });
-            });
-
-        const students = Array.from(merged.values());
-        console.log(`Faculty Department: ${dept}`);
-        console.log(`Students fetched after merge: ${students.length}`);
-        callback(students);
+        callback(mergeStudentRecords(latestStudents, latestUsers));
     };
 
     const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {

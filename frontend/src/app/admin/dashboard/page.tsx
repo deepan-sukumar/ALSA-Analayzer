@@ -34,15 +34,53 @@ import {
     Area
 } from "recharts";
 import { User } from "@/types";
-import { calculatePRI, getPlacementReadiness } from "@/lib/placement-calculations";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { calculatePRI, getPlacementReadiness } from "@/lib/calculations/placement-calculations";
 import { Badge } from "@/components/ui/badge";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
+import { normalizeDepartment } from "@/lib/core/department-core";
 
 const CHART_AXIS_COLOR = "hsl(var(--muted-foreground))";
 const CHART_GRID_COLOR = "hsl(var(--border))";
+
+const formatBucketLabel = (date: Date) =>
+    date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+
+const parseTimestamp = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") return value.toDate();
+    if (typeof value?.seconds === "number") return new Date(value.seconds * 1000);
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getTrendBuckets = (students: User[]) => {
+    const monthly = new Map<string, { monthDate: Date; count: number; priTotal: number }>();
+
+    students.forEach((student, index) => {
+        const sourceDate =
+            parseTimestamp(student.lastUpdated) ||
+            parseTimestamp((student as any).updatedAt) ||
+            parseTimestamp((student as any).createdAt);
+
+        const date = sourceDate || new Date(Date.now() - (students.length - index) * 86400000);
+        const monthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        const key = monthDate.toISOString();
+        const current = monthly.get(key) || { monthDate, count: 0, priTotal: 0 };
+        current.count += 1;
+        current.priTotal += calculatePRI(student).pri;
+        monthly.set(key, current);
+    });
+
+    const sorted = Array.from(monthly.values()).sort((a, b) => a.monthDate.getTime() - b.monthDate.getTime());
+    return sorted.slice(-6).map((entry) => ({
+        name: formatBucketLabel(entry.monthDate),
+        score: Math.round(entry.priTotal / Math.max(entry.count, 1)),
+        avg: Math.round(entry.priTotal / Math.max(entry.count, 1)),
+        count: entry.count,
+    }));
+};
 
 export default function AdminDashboard() {
     const [students, setStudents] = useState<User[]>([]);
@@ -53,13 +91,13 @@ export default function AdminDashboard() {
         async function fetchData() {
             setLoading(true);
             try {
-                const sQuery = query(collection(db, "students"));
-                const fQuery = query(collection(db, "faculty"));
+                const studentQuery = query(collection(db, "users"), where("role", "==", "student"));
+                const facultyQuery = query(collection(db, "users"), where("role", "==", "faculty"));
 
-                const [sSnap, fSnap] = await Promise.all([getDocs(sQuery), getDocs(fQuery)]);
+                const [studentSnap, facultySnap] = await Promise.all([getDocs(studentQuery), getDocs(facultyQuery)]);
 
-                setStudents(sSnap.docs.map(d => ({ id: d.id, ...d.data() }) as User));
-                setFaculty(fSnap.docs.map(d => ({ id: d.id, ...d.data() }) as User));
+                setStudents(studentSnap.docs.map(d => ({ id: d.id, ...d.data() }) as User));
+                setFaculty(facultySnap.docs.map(d => ({ id: d.id, ...d.data() }) as User));
             } catch (e) {
                 console.error("Failed to load users from Firestore", e);
             } finally {
@@ -77,23 +115,25 @@ export default function AdminDashboard() {
         const riskCounts = { Ready: 0, Moderate: 0, High: 0, Critical: 0 };
         const moduleScores = { academic: 0, core: 0, role: 0, aptitude: 0, enrichment: 0 };
         let totalPRI = 0;
-        const consistencyTrendData: any[] = [];
+        const consistencyTrendData = getTrendBuckets(students);
 
-        students.forEach((student, index) => {
+        students.forEach((student) => {
             const priData = calculatePRI(student);
+            const readiness = getPlacementReadiness(student);
 
             totalPRI += priData.pri;
 
             // Department
-            const dept = student.department || "Unknown";
+            const dept = normalizeDepartment(student.department || "Unknown");
             if (!departmentCounts[dept]) departmentCounts[dept] = { totalPRI: 0, count: 0 };
             departmentCounts[dept].totalPRI += priData.pri;
             departmentCounts[dept].count += 1;
 
             // Risk
-            if (priData.pri >= 75) riskCounts.Ready++;
-            else if (priData.pri >= 60 && priData.pri < 75) riskCounts.Moderate++;
-            else if (priData.pri >= 40 && priData.pri < 60) riskCounts.High++;
+            const readinessLabel = readiness.finalRisk?.label || "Low";
+            if (readinessLabel === "Low") riskCounts.Ready++;
+            else if (readinessLabel === "Moderate") riskCounts.Moderate++;
+            else if (readinessLabel === "High") riskCounts.High++;
             else riskCounts.Critical++;
 
             // Module avgs
@@ -102,20 +142,18 @@ export default function AdminDashboard() {
             moduleScores.role += priData.breakDown.role;
             moduleScores.aptitude += priData.breakDown.aptitude;
             moduleScores.enrichment += priData.breakDown.enrichment;
-
-            if (index < 12) {
-                consistencyTrendData.push({
-                    name: `P${index + 1}`,
-                    score: priData.pri,
-                    avg: 65 // Mock baseline
-                });
-            }
         });
 
         const count = students.length;
         const totalFaculty = faculty.length;
         const approvedFaculty = faculty.filter(f => f.approved).length;
         const pendingFaculty = totalFaculty - approvedFaculty;
+
+        const sortedTrend = consistencyTrendData;
+        const latestTrend = sortedTrend[sortedTrend.length - 1];
+        const previousTrend = sortedTrend[sortedTrend.length - 2];
+        const priDelta = latestTrend && previousTrend ? latestTrend.score - previousTrend.score : 0;
+        const facultyApprovalRate = totalFaculty > 0 ? Math.round((approvedFaculty / totalFaculty) * 100) : 0;
 
         return {
             avgPRI: Math.round(totalPRI / count),
@@ -124,6 +162,9 @@ export default function AdminDashboard() {
             approvedFaculty,
             pendingFaculty,
             highRiskCount: riskCounts.High + riskCounts.Critical,
+            facultyApprovalRate,
+            priDelta,
+            activeDepartments: Object.keys(departmentCounts).length,
 
             departmentData: Object.entries(departmentCounts).map(([name, data]) => ({
                 name,
@@ -145,7 +186,7 @@ export default function AdminDashboard() {
                 { name: "Enrichment", score: Math.round(moduleScores.enrichment / count), fill: "#f43f5e" },
             ],
 
-            consistencyTrendData,
+            consistencyTrendData: sortedTrend,
             insights: [] as string[]
         };
     }, [students, faculty]);
@@ -224,7 +265,7 @@ export default function AdminDashboard() {
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-slate-400">Command Center</span>
                             </h1>
                             <p className="text-slate-400 font-medium text-lg md:text-xl max-w-xl leading-relaxed">
-                                Orchestrating macro-level insights across <span className="text-white font-bold">{analytics.totalStudents} intelligence nodes</span> and <span className="text-white font-bold">{analytics.totalFaculty} verifyable faculty members</span>.
+                                Orchestrating macro-level insights across <span className="text-white font-bold">{analytics.totalStudents} intelligence nodes</span> and <span className="text-white font-bold">{analytics.totalFaculty} verified faculty members</span>.
                             </p>
                         </div>
 
@@ -235,7 +276,7 @@ export default function AdminDashboard() {
                             </div>
                             <div className="px-4 py-2 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-3">
                                 <Activity className="h-3 w-3 text-blue-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Macro Sync: 100%</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Faculty Approval: {analytics.facultyApprovalRate}%</span>
                             </div>
                         </div>
                     </div>
@@ -244,23 +285,32 @@ export default function AdminDashboard() {
                         <div className="absolute inset-0 bg-blue-500/20 blur-[60px] rounded-full scale-75 opacity-0 group-hover/score:opacity-100 transition-opacity duration-700" />
                         <div className="relative bg-white/5 backdrop-blur-2xl rounded-[40px] p-10 border border-white/10 shadow-inner min-w-[280px] hover:border-blue-500/30 transition-all duration-500">
                             <p className="text-[11px] font-black text-blue-400 uppercase tracking-[0.25em] mb-4">Global PRI Index</p>
-                            <div className="flex items-baseline gap-3">
-                                <p className="text-8xl font-black leading-none text-white tracking-tighter">{analytics.avgPRI}</p>
-                                <div className="flex flex-col">
-                                    <TrendingUp className="h-8 w-8 text-emerald-400" />
-                                    <span className="text-[10px] font-black text-emerald-400/80 tracking-widest">+2.4%</span>
+                                <div className="flex items-baseline gap-3">
+                                    <p className="text-8xl font-black leading-none text-white tracking-tighter">{analytics.avgPRI}</p>
+                                    <div className="flex flex-col">
+                                    {analytics.priDelta >= 0 ? (
+                                        <TrendingUp className="h-8 w-8 text-emerald-400" />
+                                    ) : (
+                                        <TrendingDown className="h-8 w-8 text-rose-400" />
+                                    )}
+                                    <span className={`text-[10px] font-black tracking-widest ${analytics.priDelta >= 0 ? "text-emerald-400/80" : "text-rose-400/80"}`}>
+                                        {analytics.priDelta >= 0 ? "+" : ""}{analytics.priDelta}
+                                    </span>
+                                    </div>
+                                </div>
+                                <div className="mt-5 pt-6 border-t border-white/5 space-y-3">
+                                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                    <span>Department Coverage</span>
+                                    <span className="text-blue-400">{analytics.activeDepartments} Active</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                                        style={{ width: `${Math.min(100, Math.max(10, analytics.facultyApprovalRate || 10))}%` }}
+                                    />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="mt-5 pt-6 border-t border-white/5 space-y-3">
-                                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                    <span>Sync Status</span>
-                                    <span className="text-blue-400">Verifying...</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 w-[85%] rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -273,7 +323,7 @@ export default function AdminDashboard() {
                     { label: "Verified Assets", val: analytics.approvedFaculty, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
                     { label: "Auth Backlog", val: analytics.pendingFaculty, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20", alert: analytics.pendingFaculty > 0 },
                     { label: "Critical Risk", val: analytics.highRiskCount, icon: TrendingDown, color: "text-rose-500", bg: "bg-rose-500/10", border: "border-rose-500/20", alert: analytics.highRiskCount > 5 },
-                    { label: "Uptime Metric", val: "99.99%", icon: Zap, color: "text-cyan-500", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
+                    { label: "Departments Active", val: analytics.activeDepartments, icon: Building2, color: "text-cyan-500", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
                 ].map((kpi, i) => (
                     <Card key={i} className={`relative border-none bg-white dark:bg-slate-900 shadow-xl hover:shadow-2xl transition-all duration-500 group overflow-hidden rounded-[32px] ${kpi.alert ? 'ring-2 ring-rose-500/20' : ''}`}>
                         <div className={`absolute top-0 left-0 w-1.5 h-full ${kpi.color.replace('text', 'bg')}`} />
@@ -542,4 +592,5 @@ export default function AdminDashboard() {
         </div>
     );
 }
+
 

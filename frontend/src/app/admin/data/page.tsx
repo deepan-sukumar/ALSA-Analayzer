@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { collection, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, getDocs, doc, deleteDoc, writeBatch } from "firebase/firestore";
+import { db } from "@/lib/firebase/firebase";
 import { toast } from "sonner";
 import { ServerCrash, Eraser, AlertTriangle, Loader2 } from "lucide-react";
 import { User as AppUser } from "@/types";
@@ -14,24 +14,24 @@ export default function DataControlPage() {
     const [processingE, setProcessingE] = useState(false);
     const [processingS, setProcessingS] = useState(false);
 
+    const commitChunkedWrites = async (
+        entries: Array<(batch: ReturnType<typeof writeBatch>) => void>,
+        chunkSize = 400
+    ) => {
+        for (let i = 0; i < entries.length; i += chunkSize) {
+            const batch = writeBatch(db);
+            entries.slice(i, i + chunkSize).forEach((entry) => entry(batch));
+            await batch.commit();
+        }
+    };
+
     const syncStudentsCollection = async () => {
         setProcessingS(true);
         try {
-            const snap = await getDocs(collection(db, "users"));
-            const users = snap.docs.map(d => ({ id: d.id, ...d.data() }) as AppUser);
-            const students = users.filter(u => u.role === "student");
-
-            const batchPromises = students.map(s => {
-                const studentId = s.id || s.registerNumber || s.registerNo;
-                if (!studentId) return Promise.resolve();
-                return updateDoc(doc(db, "students", studentId), s as any).catch(() =>
-                    // Fallback to setDoc if it doesn't exist
-                    import("firebase/firestore").then(mod => mod.setDoc(doc(db, "students", studentId), s, { merge: true }))
-                );
-            });
-
-            await Promise.all(batchPromises);
-            toast.success(`Successfully synced ${students.length} students to the dedicated collection.`);
+            const res = await fetch("/api/admin/sync-students", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || "Sync failed");
+            toast.success(`Successfully synced ${data.count || 0} students to the dedicated collection.`);
         } catch (e) {
             toast.error("Failed to sync students: " + (e as Error).message);
         } finally {
@@ -52,15 +52,30 @@ export default function DataControlPage() {
         setProcessingE(true);
         try {
             const snap = await getDocs(collection(db, "users"));
-            const batchPromises = snap.docs.map(d => updateDoc(doc(db, "users", d.id), {
-                academicEnrichment: [],
-                appliedKnowledge: [],
-                academicEngagement: [],
-                certifications: [],
-                competitions: [],
-                extraCurricular: []
-            }));
-            await Promise.all(batchPromises);
+            const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+
+            snap.docs.forEach((d) => {
+                const data = d.data() as AppUser;
+                const resetPayload = {
+                    academicEnrichment: [],
+                    appliedKnowledge: [],
+                    academicEngagement: [],
+                    certifications: [],
+                    competitions: [],
+                    extraCurricular: []
+                };
+                const mirrorCollection = data.role === "faculty" ? "faculty" : data.role === "student" ? "students" : null;
+                const mirrorId = data.registerNumber || data.registerNo || d.id;
+
+                operations.push((batch) => {
+                    batch.update(doc(db, "users", d.id), resetPayload);
+                    if (mirrorCollection) {
+                        batch.set(doc(db, mirrorCollection, mirrorId), resetPayload, { merge: true });
+                    }
+                });
+            });
+
+            await commitChunkedWrites(operations);
             toast.success("Successfully wiped all enrichment records globally.");
         } catch (e) {
             toast.error("Failed to wipe enrichment data: " + (e as Error).message);
@@ -87,8 +102,14 @@ export default function DataControlPage() {
             // Filter out Admins to prevent locking ourselves out
             const toDelete = users.filter(u => u.role !== "admin");
 
-            const batchPromises = toDelete.map(u => deleteDoc(doc(db, "users", u.id)));
-            await Promise.all(batchPromises);
+            const deletePromises = toDelete.flatMap(u => {
+                const mirrorId = u.registerNumber || u.registerNo || u.id;
+                const deletes = [deleteDoc(doc(db, "users", u.id))];
+                if (u.role === "student") deletes.push(deleteDoc(doc(db, "students", mirrorId)));
+                if (u.role === "faculty") deletes.push(deleteDoc(doc(db, "faculty", mirrorId)));
+                return deletes;
+            });
+            await Promise.all(deletePromises);
 
             toast.success(`Successfully deleted ${toDelete.length} user records.`);
         } catch (e) {
@@ -189,3 +210,4 @@ export default function DataControlPage() {
         </div>
     );
 }
+

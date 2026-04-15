@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, doc, deleteDoc, updateDoc, writeBatch, query, where } from "firebase/firestore";
-import { calculatePRI } from "@/lib/placement-calculations";
+import { db } from "@/lib/firebase/firebase";
+import { collection, getDocs, doc, deleteDoc, updateDoc, writeBatch, query, where } from "firebase/firestore";
+import { calculatePRI, getPlacementReadiness } from "@/lib/calculations/placement-calculations";
 import { User as AppUser } from "@/types";
+import { normalizeDepartment } from "@/lib/core/department-core";
 import {
     Loader2,
     RefreshCw,
@@ -50,6 +51,17 @@ export default function AdminDataControl() {
     const [isBackingUp, setIsBackingUp] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 
+    const commitChunkedWrites = async (
+        entries: Array<(batch: ReturnType<typeof writeBatch>) => void>,
+        chunkSize = 400
+    ) => {
+        for (let i = 0; i < entries.length; i += chunkSize) {
+            const batch = writeBatch(db);
+            entries.slice(i, i + chunkSize).forEach((entry) => entry(batch));
+            await batch.commit();
+        }
+    };
+
     // 1. Recalculate All PRI Scores
     const handleRecalculatePRI = async () => {
         setIsRecalculating(true);
@@ -58,20 +70,40 @@ export default function AdminDataControl() {
             const q = query(studentsRef, where("role", "==", "student"));
             const querySnapshot = await getDocs(q);
 
-            const batch = writeBatch(db);
-            let updateCount = 0;
+            const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
             querySnapshot.forEach((docSnap) => {
                 const studentData = { id: docSnap.id, ...docSnap.data() } as AppUser;
                 const priData = calculatePRI(studentData);
-                const docRef = doc(db, "users", docSnap.id);
-                batch.update(docRef, { cachedPRI: priData.pri, lastCalculated: new Date() });
-                updateCount++;
+                const readiness = getPlacementReadiness(studentData);
+                const normalizedDepartment = normalizeDepartment(studentData.department || "");
+                const studentMirrorId = studentData.registerNumber || studentData.registerNo || docSnap.id;
+                const syncPayload = {
+                    cachedPRI: priData.pri,
+                    priScore: priData.pri,
+                    readinessScore: readiness.finalRisk?.index || 0,
+                    riskLevel: readiness.finalRisk?.label === "Low" ? "Ready" : (readiness.finalRisk?.label || "High"),
+                    department: normalizedDepartment,
+                    lastCalculated: new Date(),
+                    updatedAt: new Date(),
+                };
+
+                operations.push((batch) => {
+                    batch.update(doc(db, "users", docSnap.id), syncPayload);
+                    batch.set(doc(db, "students", studentMirrorId), {
+                        ...studentData,
+                        ...syncPayload,
+                        registerNumber: studentData.registerNumber || studentData.registerNo || studentMirrorId,
+                        registerNo: studentData.registerNo || studentData.registerNumber || studentMirrorId,
+                        department: normalizedDepartment,
+                        role: "student",
+                    }, { merge: true });
+                });
             });
 
-            if (updateCount > 0) {
-                await batch.commit();
-                toast.success(`Metrics recalculated for ${updateCount} identity nodes.`);
+            if (operations.length > 0) {
+                await commitChunkedWrites(operations);
+                toast.success(`Metrics recalculated for ${operations.length} identity nodes.`);
             } else {
                 toast.info("No identity records found in targeting vector.");
             }
@@ -142,10 +174,17 @@ export default function AdminDataControl() {
             const q = query(colRef, where("role", "==", type));
             const querySnapshot = await getDocs(q);
 
-            const deletePromises = querySnapshot.docs.map(d => deleteDoc(doc(db, "users", d.id)));
+            const deletePromises = querySnapshot.docs.flatMap(d => {
+                const data = d.data() as Record<string, any>;
+                const mirrorId = data.registerNumber || data.registerNo || d.id;
+                return [
+                    deleteDoc(doc(db, "users", d.id)),
+                    deleteDoc(doc(db, type === "students" ? "students" : "faculty", mirrorId)),
+                ];
+            });
             await Promise.all(deletePromises);
 
-            toast.success(`Structural purge complete: ${deletePromises.length} nodes deleted.`);
+            toast.success(`Structural purge complete: ${querySnapshot.docs.length} nodes deleted.`);
         } catch (error: any) {
             toast.error("Purge operation intercepted logic error.");
         } finally {
@@ -160,16 +199,21 @@ export default function AdminDataControl() {
             const usersRef = collection(db, "users");
             const snap = await getDocs(usersRef);
             let deletedCount = 0;
-            const batch = writeBatch(db);
+            const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
             snap.forEach(docSnap => {
                 const data = docSnap.data();
                 if (!data.role || !data.email) {
-                    batch.delete(doc(db, "users", docSnap.id));
+                    const mirrorCollection = data.role === "faculty" ? "faculty" : "students";
+                    const mirrorId = data.registerNumber || data.registerNo || docSnap.id;
+                    operations.push((batch) => {
+                        batch.delete(doc(db, "users", docSnap.id));
+                        batch.delete(doc(db, mirrorCollection, mirrorId));
+                    });
                     deletedCount++;
                 }
             });
-            if (deletedCount > 0) await batch.commit();
+            if (deletedCount > 0) await commitChunkedWrites(operations);
 
             toast.success(`Orphan cleanup successfully processed ${deletedCount} nodes.`);
         } catch (e: any) {
@@ -185,22 +229,29 @@ export default function AdminDataControl() {
             const usersRef = collection(db, "users");
             const snap = await getDocs(usersRef);
             let updateCount = 0;
-            const batch = writeBatch(db);
-            const { normalizeDepartment } = await import("@/lib/department-core");
+            const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+            const { normalizeDepartment } = await import("@/lib/core/department-core");
 
             snap.forEach(docSnap => {
                 const data = docSnap.data();
                 if (data.department) {
                     const normalized = normalizeDepartment(data.department);
                     if (normalized !== data.department) {
-                        batch.update(doc(db, "users", docSnap.id), { department: normalized });
+                        const mirrorCollection = data.role === "faculty" ? "faculty" : data.role === "student" ? "students" : null;
+                        const mirrorId = data.registerNumber || data.registerNo || docSnap.id;
+                        operations.push((batch) => {
+                            batch.update(doc(db, "users", docSnap.id), { department: normalized });
+                            if (mirrorCollection) {
+                                batch.set(doc(db, mirrorCollection, mirrorId), { department: normalized }, { merge: true });
+                            }
+                        });
                         updateCount++;
                     }
                 }
             });
 
             if (updateCount > 0) {
-                await batch.commit();
+                await commitChunkedWrites(operations);
                 toast.success(`Department normalization complete for ${updateCount} nodes.`);
             } else {
                 toast.info("Institutional headers are already normalized.");
@@ -218,18 +269,25 @@ export default function AdminDataControl() {
             const usersRef = collection(db, "users");
             const snap = await getDocs(usersRef);
             let deletedCount = 0;
-            const batch = writeBatch(db);
+            const operations: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
             snap.forEach(docSnap => {
                 const data = docSnap.data();
                 const email = data.email?.toLowerCase() || "";
                 const name = data.name?.toLowerCase() || "";
                 if (email.includes("test") || name.includes("test")) {
-                    batch.delete(doc(db, "users", docSnap.id));
+                    const mirrorCollection = data.role === "faculty" ? "faculty" : "students";
+                    const mirrorId = data.registerNumber || data.registerNo || docSnap.id;
+                    operations.push((batch) => {
+                        batch.delete(doc(db, "users", docSnap.id));
+                        if (data.role === "student" || data.role === "faculty") {
+                            batch.delete(doc(db, mirrorCollection, mirrorId));
+                        }
+                    });
                     deletedCount++;
                 }
             });
-            if (deletedCount > 0) await batch.commit();
+            if (deletedCount > 0) await commitChunkedWrites(operations);
 
             toast.success(`Test account purge verified for ${deletedCount} nodes.`);
         } catch (e: any) {
@@ -243,13 +301,32 @@ export default function AdminDataControl() {
         setIsBackingUp(true);
         try {
             const usersRef = collection(db, "users");
+            const studentsRef = collection(db, "students");
+            const facultyRef = collection(db, "faculty");
             const issuesRef = collection(db, "system_issues");
-            const [uSnap, iSnap] = await Promise.all([getDocs(usersRef), getDocs(issuesRef)]);
+            const configRef = collection(db, "systemConfig");
+            const [uSnap, sSnap, fSnap, iSnap, cSnap] = await Promise.all([
+                getDocs(usersRef),
+                getDocs(studentsRef),
+                getDocs(facultyRef),
+                getDocs(issuesRef),
+                getDocs(configRef),
+            ]);
 
             const backup = {
                 users: uSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                students: sSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                faculty: fSnap.docs.map(d => ({ id: d.id, ...d.data() })),
                 system_issues: iSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                timestamp: new Date().toISOString()
+                systemConfig: cSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                timestamp: new Date().toISOString(),
+                counts: {
+                    users: uSnap.size,
+                    students: sSnap.size,
+                    faculty: fSnap.size,
+                    systemIssues: iSnap.size,
+                    configDocs: cSnap.size,
+                }
             };
 
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -574,4 +651,5 @@ export default function AdminDataControl() {
         </div>
     );
 }
+
 
