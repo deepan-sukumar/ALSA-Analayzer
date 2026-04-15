@@ -226,19 +226,19 @@ export default function StudentDashboard() {
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             {/* 1. Hero Section */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-800 dark:from-indigo-900 dark:via-purple-900 dark:to-slate-900 p-8 md:p-10 text-white shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)] dark:shadow-[0_10px_40px_-10px_rgba(30,27,75,0.8)] group">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-800 dark:from-indigo-900 dark:via-purple-900 dark:to-slate-900 p-5 sm:p-6 md:p-10 text-white shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)] dark:shadow-[0_10px_40px_-10px_rgba(30,27,75,0.8)] group">
                 <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/10 to-transparent blur-3xl group-hover:from-white/20 transition-all duration-1000" />
                 <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl animate-pulse" />
                 <div className="absolute -top-20 -left-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
 
-                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-                    <div className="space-y-5 max-w-[calc(100%-12rem)]">
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8">
+                    <div className="min-w-0 space-y-4 sm:space-y-5 max-w-full md:max-w-[calc(100%-12rem)]">
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/20 dark:bg-slate-900/40 px-4 py-1.5 text-xs font-bold tracking-wide backdrop-blur-md border border-white/30 text-white shadow-inner">
                             <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
                             <span>Professional Development Active</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-100 drop-shadow-sm pb-2 leading-tight">Prime Progress, {firstName}</h1>
-                        <div className="text-white/90 max-w-xl text-lg leading-relaxed space-y-2 pb-1">
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-100 drop-shadow-sm pb-2 leading-tight">Prime Progress, {firstName}</h1>
+                        <div className="text-white/90 max-w-xl text-base sm:text-lg leading-relaxed space-y-2 pb-1">
                             <p>Your <span className="text-white font-black tracking-wide drop-shadow-md">Professional Readiness Index (PRI)</span> is currently <span className="text-amber-300 font-extrabold text-xl px-1 drop-shadow-md">{priValue}%</span></p>
                             <p className="text-sm">Target tier: <span className="bg-white/20 dark:bg-indigo-900/60 text-white px-2.5 py-1 rounded-md font-bold backdrop-blur-sm border border-white/20">{tier}</span></p>
                         </div>
@@ -258,7 +258,7 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Circular PRI Display */}
-                    <div className="relative group/circle shrink-0">
+                    <div className="relative group/circle shrink-0 self-center md:self-auto">
                         <div className="absolute -inset-2 bg-gradient-to-tr from-amber-400 via-orange-500 to-amber-300 rounded-full blur-xl opacity-40 group-hover/circle:opacity-70 group-hover/circle:blur-2xl transition duration-700 animate-spin-slow" />
                         <div className="relative flex h-36 w-36 md:h-44 md:w-44 items-center justify-center rounded-full bg-white dark:bg-slate-900/30 border-[6px] border-white/30 shadow-2xl group-hover/circle:border-amber-400 group-hover/circle:scale-105 transition-all duration-500 backdrop-blur-xl">
                             <div className="text-center transform group-hover/circle:-translate-y-1 transition-transform">
@@ -829,6 +829,7 @@ function StatCard({ title, value, sub, icon: Icon, color, isRisk, isLarge, isPin
     const colorClasses: any = {
         blue: "from-blue-500/10 to-transparent dark:from-blue-500/20 border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400 shadow-blue-500/5",
         emerald: "from-emerald-500/10 to-transparent dark:from-emerald-500/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/5",
+        yellow: "from-yellow-500/10 to-transparent dark:from-yellow-500/20 border-yellow-200 dark:border-yellow-800/50 text-yellow-600 dark:text-yellow-400 shadow-yellow-500/5",
         orange: "from-orange-500/10 to-transparent dark:from-orange-500/20 border-orange-200 dark:border-orange-800/50 text-orange-600 dark:text-orange-400 shadow-orange-500/5",
         purple: "from-purple-500/10 to-transparent dark:from-purple-500/20 border-purple-200 dark:border-purple-800/50 text-purple-600 dark:text-purple-400 shadow-purple-500/5",
         pink: "from-pink-500/10 to-transparent dark:from-pink-500/20 border-pink-200 dark:border-pink-800/50 text-pink-600 dark:text-pink-400 shadow-pink-500/5",
@@ -837,21 +838,26 @@ function StatCard({ title, value, sub, icon: Icon, color, isRisk, isLarge, isPin
     const iconBgClasses: any = {
         blue: "bg-blue-100 dark:bg-blue-900/60 shadow-[0_0_15px_rgba(59,130,246,0.5)]",
         emerald: "bg-emerald-100 dark:bg-emerald-900/60 shadow-[0_0_15px_rgba(16,185,129,0.5)]",
+        yellow: "bg-yellow-100 dark:bg-yellow-900/60 shadow-[0_0_15px_rgba(234,179,8,0.5)]",
         orange: "bg-orange-100 dark:bg-orange-900/60 shadow-[0_0_15px_rgba(249,115,22,0.5)]",
         purple: "bg-purple-100 dark:bg-purple-900/60 shadow-[0_0_15px_rgba(168,85,247,0.5)]",
         pink: "bg-pink-100 dark:bg-pink-900/60 shadow-[0_0_15px_rgba(236,72,153,0.5)]",
     };
 
+    const resolvedColor = colorClasses[color] ? color : "blue";
+    const resolvedColorTokens = colorClasses[resolvedColor].split(" ");
+    const resolvedTextClass = resolvedColorTokens[4] ?? "text-blue-600";
+
     return (
         <Card className={cn(
             "border shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden group hover:-translate-y-1 hover:border-transparent dark:hover:border-transparent cursor-default",
             isRisk ? "bg-white dark:bg-slate-900" : "bg-white dark:bg-slate-900",
-            `hover:shadow-[0_10px_30px_-10px_var(--tw-shadow-color)] ${colorClasses[color].split(' ').pop()}`
+            `hover:shadow-[0_10px_30px_-10px_var(--tw-shadow-color)] ${resolvedColorTokens[resolvedColorTokens.length - 1]}`
         )}>
-            <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50 dark:opacity-30 group-hover:opacity-100 transition-opacity duration-500", colorClasses[color].split(' ').slice(0, 2).join(' '))} />
+            <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50 dark:opacity-30 group-hover:opacity-100 transition-opacity duration-500", resolvedColorTokens.slice(0, 2).join(' '))} />
             <CardContent className="p-5 flex items-center gap-5 relative z-10">
-                <div className={cn("p-3 rounded-2xl border border-white/20 dark:border-slate-800/50 flex shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500", iconBgClasses[color])}>
-                    <Icon className={cn("h-6 w-6", colorClasses[color].split(' ')[4])} />
+                <div className={cn("p-3 rounded-2xl border border-white/20 dark:border-slate-800/50 flex shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500", iconBgClasses[resolvedColor])}>
+                    <Icon className={cn("h-6 w-6", resolvedTextClass)} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mb-1.5">{title}</p>
@@ -870,11 +876,12 @@ function RiskMetric({ label, status, icon: Icon, color, isText }: any) {
         amber: "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50",
         purple: "text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50",
     };
+    const resolvedColor = colorClasses[color] ? color : "blue";
 
     return (
         <div className="flex items-center justify-between p-3 rounded-2xl border border-border bg-card hover:border-border/80 transition-all shadow-sm">
             <div className="flex items-center gap-2">
-                <div className={cn("p-1.5 rounded-lg", colorClasses[color])}>
+                <div className={cn("p-1.5 rounded-lg", colorClasses[resolvedColor])}>
                     <Icon className="h-3.5 w-3.5" />
                 </div>
                 <span className="text-xs font-bold text-muted-foreground">{label}</span>
@@ -898,27 +905,31 @@ function PlanCard({ time, desc, title, steps, icon: Icon, color }: any) {
         emerald: "from-emerald-500/5 to-transparent",
         purple: "from-purple-500/5 to-transparent",
     };
+    const resolvedColor = colorClasses[color] ? color : "blue";
+    const resolvedColorTokens = colorClasses[resolvedColor].split(" ");
+    const resolvedTextClass = resolvedColorTokens[2] ?? "text-blue-700";
+    const resolvedHoverClasses = resolvedColorTokens.filter((c: string) => c.startsWith("hover")).join(" ");
 
     return (
-        <Card className={cn("border-2 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden relative", colorClasses[color].split(' hover:')[0], colorClasses[color].split(' ').filter((c: string) => c.startsWith('hover')).join(' '))}>
-            <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300", gradientClasses[color])} />
+        <Card className={cn("border-2 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden relative", colorClasses[resolvedColor].split(' hover:')[0], resolvedHoverClasses)}>
+            <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300", gradientClasses[resolvedColor])} />
             <CardContent className="p-4 relative z-10">
                 <div className="flex items-start justify-between mb-3">
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shadow-sm bg-white dark:bg-slate-900", colorClasses[color].split(' ')[0], colorClasses[color].split(' ')[2])}>{time}</span>
+                            <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shadow-sm bg-white dark:bg-slate-900", resolvedColorTokens[0], resolvedTextClass)}>{time}</span>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">{desc}</span>
                         </div>
-                        <h3 className={cn("font-black text-slate-800 dark:text-slate-100 text-base transition-colors group-hover:text-shadow-sm", colorClasses[color].split(' ')[2].replace('text-', 'group-hover:text-').replace('dark:text-', 'dark:group-hover:text-'))}>{title}</h3>
+                        <h3 className={cn("font-black text-slate-800 dark:text-slate-100 text-base transition-colors group-hover:text-shadow-sm", resolvedTextClass.replace('text-', 'group-hover:text-').replace('dark:text-', 'dark:group-hover:text-'))}>{title}</h3>
                     </div>
-                    <div className={cn("p-2 rounded-xl border bg-white dark:bg-slate-900 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:shadow-md", colorClasses[color].split(' ')[0])}>
-                        <Icon className={cn("h-4 w-4", colorClasses[color].split(' ')[2])} />
+                    <div className={cn("p-2 rounded-xl border bg-white dark:bg-slate-900 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:shadow-md", resolvedColorTokens[0])}>
+                        <Icon className={cn("h-4 w-4", resolvedTextClass)} />
                     </div>
                 </div>
                 <div className="space-y-2 mt-4 bg-white/40 dark:bg-slate-900/40 p-2 rounded-lg border border-black/5 dark:border-white/5">
                     {steps.map((step: string, i: number) => (
                         <div key={i} className="flex items-center gap-2.5">
-                            <div className={cn("h-1.5 w-1.5 rounded-full shadow-sm", color === 'blue' ? 'bg-blue-500' : (color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'))} />
+                            <div className={cn("h-1.5 w-1.5 rounded-full shadow-sm", resolvedColor === 'blue' ? 'bg-blue-500' : (resolvedColor === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'))} />
                             <p className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold leading-tight">{step}</p>
                         </div>
                     ))}
