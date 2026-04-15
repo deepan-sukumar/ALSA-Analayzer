@@ -2,12 +2,10 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
-import { getPlacementReadiness } from "@/lib/placement-calculations";
+import { getPlacementReadiness } from "@/lib/calculations/placement-calculations";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Target, TrendingUp, CheckCircle2, BookOpen, Calendar, Map, Activity, ShieldAlert, Clock, Sparkles, BrainCircuit, Loader2 } from "lucide-react";
+import { Target, TrendingUp, CheckCircle2, Calendar, Map, ShieldAlert, Clock, Sparkles, BrainCircuit, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -23,8 +21,45 @@ export default function DevelopmentAnalyticsPage() {
     const [aiRoadmap, setAiRoadmap] = useState<{ week: string; priority: string; focus: string; tasks: string[] }[]>([]);
     const [aiLoading, setAiLoading] = useState(false);
 
+    const hasOutcomeAlignmentProgress = useMemo(() => {
+        if (!user) return false;
+
+        const selectedTrack = user.roleTrackProfile?.trackSelected || user.outcomeAlignment?.role?.trackSelected || user.outcomeAlignment?.trackSelected;
+        const selectedCoreCount = Object.values(user.outcomeAlignment?.coreTopics || user.coreAcademicTopics || {}).reduce((sum: number, topics: any) => {
+            return sum + (Array.isArray(topics) ? topics.length : 0);
+        }, 0);
+        const verifiedCoreCount = Object.values(user.verifiedCoreTopics || {}).reduce((sum: number, topics: any) => {
+            return sum + (Array.isArray(topics) ? topics.length : 0);
+        }, 0);
+        const selectedRoleCount = ["core", "intermediate", "advanced"].reduce((sum, level) => {
+            const topics = user.outcomeAlignment?.role?.concepts?.[level as "core" | "intermediate" | "advanced"];
+            return sum + (Array.isArray(topics) ? topics.length : 0);
+        }, 0);
+        const verifiedRoleCount = ["core", "intermediate", "advanced"].reduce((sum, level) => {
+            const topics = user.verifiedRoleConcepts?.[level as "core" | "intermediate" | "advanced"];
+            return sum + (Array.isArray(topics) ? topics.length : 0);
+        }, 0);
+        const failedVerifications = Number(user.failedVerifications || 0);
+
+        return Boolean(
+            selectedTrack ||
+            (
+                selectedCoreCount > 0 ||
+                verifiedCoreCount > 0 ||
+                selectedRoleCount > 0 ||
+                verifiedRoleCount > 0 ||
+                failedVerifications > 0
+            )
+        );
+    }, [user]);
+
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setAiDrawbacks([]);
+            setAiRoadmap([]);
+            setAiLoading(false);
+            return;
+        }
         let cancelled = false;
         const fetchAI = async () => {
             setAiLoading(true);
@@ -32,7 +67,8 @@ export default function DevelopmentAnalyticsPage() {
                 const res = await fetch('/api/ai-recommendations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student: user, context: 'outcome' })
+                    cache: 'no-store',
+                    body: JSON.stringify({ student: user, context: 'outcome', requestedAt: Date.now() })
                 });
                 if (res.ok && !cancelled) {
                     const data = await res.json();
@@ -46,19 +82,109 @@ export default function DevelopmentAnalyticsPage() {
             }
         };
         fetchAI();
-        return () => { cancelled = true; };
+        const handleFocus = () => {
+            if (document.visibilityState === "visible") {
+                fetchAI();
+            }
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleFocus);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleFocus);
+        };
     }, [user]);
+
+    const displayDrawbacks = useMemo(() => {
+        if (aiDrawbacks.length > 0) return aiDrawbacks;
+
+        const merged: { drawback: string; suggestion: string }[] = [];
+        const addUnique = (item: { drawback: string; suggestion: string }) => {
+            const key = String(item.drawback || "").trim().toLowerCase();
+            if (!key) return;
+            if (!merged.some((existing) => String(existing.drawback || "").trim().toLowerCase() === key)) {
+                merged.push(item);
+            }
+        };
+
+        (analysis?.performanceGaps || []).forEach((gap: any) => {
+            addUnique({
+                drawback: gap.problem || `${gap.domain} remains uncovered or unverified.`,
+                suggestion: Array.isArray(gap.actionPlan) && gap.actionPlan.length > 0
+                    ? gap.actionPlan.slice(0, 2).join(" ")
+                    : `Prioritize ${gap.domain} and complete the remaining verification topics.`,
+            });
+        });
+
+        (analysis?.strategy?.improvements || []).forEach((item: any) => {
+            addUnique({
+                drawback: item.area || "Outcome alignment gap",
+                suggestion: item.solution || "Close the remaining uncovered concepts with structured revision and verification.",
+            });
+        });
+
+        (analysis?.growthSuggestions || []).slice(0, 4).forEach((suggestion: string) => {
+            addUnique({
+                drawback: "Readiness growth opportunity",
+                suggestion,
+            });
+        });
+
+        return merged.slice(0, 12);
+    }, [aiDrawbacks, analysis]);
+
+    const displayRoadmap = useMemo(() => {
+        if (aiRoadmap.length > 0) return aiRoadmap;
+
+        const smartRoadmap = analysis?.smartRoadmap || [];
+        if (smartRoadmap.length > 0) {
+            return smartRoadmap.slice(0, 3).map((item: any) => ({
+                week: item.week,
+                priority: item.priority,
+                focus: item.title || item.focus || "Outcome Recovery",
+                tasks: Array.isArray(item.tasks) ? item.tasks : [],
+            }));
+        }
+
+        const weeklyRoadmap = analysis?.weeklyRoadmap || [];
+        if (weeklyRoadmap.length > 0) {
+            return weeklyRoadmap.slice(0, 3).map((item: any, idx: number) => ({
+                week: item.week || `Phase ${idx + 1}`,
+                priority: idx === 0 ? "High" : "Moderate",
+                focus: item.focus || "Outcome Recovery",
+                tasks: Array.isArray(item.tasks) ? item.tasks : [],
+            }));
+        }
+
+        const topGaps = (analysis?.performanceGaps || []).slice(0, 3);
+        if (topGaps.length > 0) {
+            return topGaps.map((gap: any, idx: number) => ({
+                week: ["Week 1-2", "Week 3-4", "Week 5-6"][idx] || `Phase ${idx + 1}`,
+                priority: gap.priority === "Critical" ? "Critical" : gap.riskLevel === "High" ? "High" : "Moderate",
+                focus: gap.domain || "Outcome Alignment Improvement",
+                tasks: Array.isArray(gap.actionPlan) && gap.actionPlan.length > 0
+                    ? gap.actionPlan.slice(0, 3)
+                    : [`Complete the remaining ${gap.domain} topics.`, "Attempt verification tests again."],
+            }));
+        }
+
+        return [];
+    }, [aiRoadmap, analysis]);
 
     if (!analysis) return null;
 
     const getRiskColor = (label: string) => {
         switch (label) {
+            case "Critical": return "text-red-700 dark:text-red-400";
             case "High": return "text-red-600 dark:text-red-400";
             case "Moderate": return "text-yellow-600 dark:text-yellow-400";
             case "Ready": return "text-blue-600 dark:text-blue-400";
             default: return "text-green-600 dark:text-green-400";
         }
     };
+
+    const readinessLevel = analysis.finalRisk?.label || "Low";
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700 pb-12">
@@ -133,7 +259,7 @@ export default function DevelopmentAnalyticsPage() {
                 </Card>
 
                 <Card className="border border-slate-200/60 dark:border-slate-800/60 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl overflow-hidden relative group hover:shadow-2xl transition-all duration-500 hover:-translate-y-1">
-                    <div className={cn("absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b rounded-l-xl", analysis.tier === "High" ? "from-red-400 to-red-600" : analysis.tier === "Moderate" ? "from-amber-400 to-amber-600" : analysis.tier === "Ready" ? "from-blue-400 to-blue-600" : "from-emerald-400 to-emerald-600")} />
+                    <div className={cn("absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b rounded-l-xl", readinessLevel === "Critical" ? "from-red-500 to-red-700" : readinessLevel === "High" ? "from-red-400 to-red-600" : readinessLevel === "Moderate" ? "from-amber-400 to-amber-600" : readinessLevel === "Ready" ? "from-blue-400 to-blue-600" : "from-emerald-400 to-emerald-600")} />
                     <CardHeader className="pb-2">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600 dark:text-indigo-400">
@@ -143,8 +269,8 @@ export default function DevelopmentAnalyticsPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="relative z-10 space-y-4">
-                        <div className={`text-4xl font-black ${getRiskColor(analysis.tier.split(' ')[0])} tracking-tight drop-shadow-sm`}>
-                            {analysis.tier}
+                        <div className={`text-4xl font-black ${getRiskColor(readinessLevel)} tracking-tight drop-shadow-sm`}>
+                            {readinessLevel}
                         </div>
                         <div className="flex items-center gap-2 text-xs font-semibold">
                             <span className="text-slate-500 dark:text-slate-400">Arrears:</span>
@@ -169,37 +295,36 @@ export default function DevelopmentAnalyticsPage() {
                             </div>
                             Performance Gaps
                         </CardTitle>
-                        <CardDescription>Data-driven gap detection with personalized recovery plan</CardDescription>
+                        <CardDescription>AI-generated readiness drawbacks with personalized recovery guidance</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-1">
                         <ScrollArea className="h-[500px] pr-4">
-                            {analysis.performanceGaps && analysis.performanceGaps.length > 0 ? (
-                                analysis.performanceGaps.map((gap, idx) => (
-                                    <Alert key={idx} className="mb-4 border-l-4 border-l-rose-500 bg-rose-50/50 dark:bg-rose-950/20">
-                                        <AlertTitle className="font-black text-rose-700 dark:text-rose-400">
-                                            {gap.domain} — {gap.coverage}% Coverage
-                                        </AlertTitle>
-                                        <AlertDescription className="mt-2 space-y-2">
-                                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{gap.problem}</p>
-                                            <div className="flex flex-wrap gap-1">
-                                                {gap.missingTopics.slice(0, 3).map((t, i) => (
-                                                    <Badge key={i} variant="outline" className="text-[10px] bg-white dark:bg-slate-900">{t}</Badge>
-                                                ))}
+                            {aiLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3 h-full border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                                    <Loader2 className="h-6 w-6 animate-spin text-rose-500" />
+                                    <p className="text-xs font-medium text-slate-500">Analyzing readiness drawbacks...</p>
+                                </div>
+                            ) : displayDrawbacks.length > 0 ? (
+                                displayDrawbacks.map((item, idx) => (
+                                    <div key={idx} className="mb-4 rounded-2xl border border-rose-100 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 p-5 shadow-sm">
+                                        <div className="flex gap-3 border-b border-rose-200/50 dark:border-rose-800/50 pb-3">
+                                            <ShieldAlert className="h-4 w-4 shrink-0 text-rose-500 mt-0.5" />
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 dark:text-rose-400">Identified Gap</p>
+                                                <p className="text-sm font-bold text-slate-800 dark:text-white mt-1">{item.drawback}</p>
                                             </div>
-                                            <div className="mt-2 text-[11px] bg-white/50 dark:bg-slate-950/30 p-2 rounded border border-black/5">
-                                                <p className="font-bold text-emerald-700 dark:text-emerald-400 mb-1">Action Plan:</p>
-                                                <ul className="list-disc list-inside">
-                                                    {gap.actionPlan.map((a, i) => <li key={i}>{a}</li>)}
-                                                </ul>
-                                            </div>
-                                        </AlertDescription>
-                                    </Alert>
+                                        </div>
+                                        <div className="mt-3 rounded-xl border border-black/5 dark:border-white/5 bg-white/60 dark:bg-slate-950/30 p-3">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-1">AI Action Plan</p>
+                                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 leading-relaxed">{item.suggestion}</p>
+                                        </div>
+                                    </div>
                                 ))
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-20 text-center">
                                     <CheckCircle2 className="h-10 w-10 text-emerald-500 mb-2" />
-                                    <p className="font-bold text-slate-800 dark:text-white">No Gaps Detected</p>
-                                    <p className="text-sm text-slate-500">Your profile is perfectly optimized for current goals.</p>
+                                    <p className="font-bold text-slate-800 dark:text-white">{hasOutcomeAlignmentProgress ? "No dynamic gaps are available right now." : "No outcome-alignment data available yet."}</p>
+                                    <p className="text-sm text-slate-500">{hasOutcomeAlignmentProgress ? "AI and fallback analysis did not find a usable recommendation set for the current profile." : "Select outcome topics or attempt verification tests to generate AI-backed drawbacks and roadmap."}</p>
                                 </div>
                             )}
                         </ScrollArea>
@@ -220,8 +345,8 @@ export default function DevelopmentAnalyticsPage() {
                                     <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
                                     <p className="text-xs font-medium text-slate-500">Generating placement roadmap...</p>
                                 </div>
-                            ) : aiRoadmap.length > 0 ? (
-                                aiRoadmap.map((week, idx) => (
+                            ) : displayRoadmap.length > 0 ? (
+                                displayRoadmap.map((week, idx) => (
                                     <PlanCard
                                         key={idx}
                                         time={week.week}
@@ -235,7 +360,7 @@ export default function DevelopmentAnalyticsPage() {
                             ) : (
                                 <div className="p-12 text-center border-2 border-dashed rounded-2xl bg-slate-50 dark:bg-slate-900/50">
                                     <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
-                                    <p className="text-sm font-medium text-slate-500">Complete profile to see your personal roadmap.</p>
+                                    <p className="text-sm font-medium text-slate-500">{hasOutcomeAlignmentProgress ? "No dynamic roadmap is available right now." : "Outcome-alignment AI roadmap will appear here once progress is available."}</p>
                                 </div>
                             )}
                         </div>
@@ -258,9 +383,9 @@ export default function DevelopmentAnalyticsPage() {
                             <div className="flex justify-center py-12">
                                 <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
                             </div>
-                        ) : aiDrawbacks.length > 0 ? (
+                        ) : displayDrawbacks.length > 0 ? (
                             <div className="grid gap-4 md:grid-cols-2">
-                                {aiDrawbacks.map((item, idx) => (
+                                {displayDrawbacks.map((item, idx) => (
                                     <div key={idx} className="p-4 rounded-xl border bg-amber-50/60 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50 flex flex-col gap-2">
                                         <div className="flex gap-2 items-start text-rose-600 dark:text-rose-400">
                                             <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
@@ -280,7 +405,7 @@ export default function DevelopmentAnalyticsPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-12 text-slate-500 italic">No significant drawbacks detected.</div>
+                            <div className="text-center py-12 text-slate-500 italic">{hasOutcomeAlignmentProgress ? "No dynamic drawbacks are available right now." : "AI suggestions will appear here from uncovered and unverified outcome-alignment topics."}</div>
                         )}
                     </CardContent>
                 </Card>
@@ -323,3 +448,4 @@ function PlanCard({ time, desc, title, steps, icon: Icon, color }: any) {
         </Card>
     );
 }
+

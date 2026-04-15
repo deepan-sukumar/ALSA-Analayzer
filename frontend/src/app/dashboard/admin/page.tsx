@@ -29,8 +29,8 @@ import {
 } from "recharts";
 import { User } from "@/types";
 import { calculateBSDI } from "@/lib/calculations";
-import { calculatePRI, getPlacementReadiness } from "@/lib/placement-calculations";
-import { getAllStudents } from "@/lib/firestore";
+import { calculatePRI, getPlacementReadiness } from "@/lib/calculations/placement-calculations";
+import { getAllStudents } from "@/lib/firebase/firestore";
 
 export default function AdminDashboard() {
     const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -297,3 +297,4 @@ export default function AdminDashboard() {
         </div>
     );
 }
+

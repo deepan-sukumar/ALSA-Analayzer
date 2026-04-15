@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { ROLE_SKILL_MATRIX, PlacementRole } from '@/lib/core/role-skills';
+import { getPlacementReadiness } from '@/lib/calculations/placement-calculations';
 
 type DrawbackItem = { drawback: string; suggestion: string };
 type RoadmapItem = { week: string; priority: string; focus: string; tasks: string[] };
@@ -12,6 +13,14 @@ const GENERIC_ACADEMIC_PHRASES = [
     "skills refinement",
     "focus on core concepts",
     "review technical documentation",
+];
+const GENERIC_OUTCOME_PHRASES = [
+    "skills refinement",
+    "focus on core concepts",
+    "review technical documentation",
+    "no significant drawbacks detected",
+    "profile is perfectly optimized",
+    "general review",
 ];
 
 function parseStructuredJson(raw: string): any {
@@ -242,6 +251,352 @@ function generateAcademicRoadmap(student: any): RoadmapItem[] {
     ];
 }
 
+function getOutcomeVerificationSummary(student: any) {
+    const selectedCoreTopics = student?.outcomeAlignment?.coreTopics || student?.coreAcademicTopics || {};
+    const verifiedCoreTopics = student?.verifiedCoreTopics || {};
+    const selectedRoleConcepts = student?.outcomeAlignment?.role?.concepts || { core: [], intermediate: [], advanced: [] };
+    const verifiedRoleConcepts = student?.verifiedRoleConcepts || { core: [], intermediate: [], advanced: [] };
+
+    const unverifiedCoreByDomain: Record<string, string[]> = {};
+    const verifiedCoreCount = Object.values(verifiedCoreTopics).reduce((sum: number, topics: any) => {
+        return sum + (Array.isArray(topics) ? topics.length : 0);
+    }, 0);
+
+    Object.entries(selectedCoreTopics).forEach(([domain, topics]) => {
+        const selected = Array.isArray(topics) ? topics : [];
+        const verified = Array.isArray((verifiedCoreTopics as any)[domain]) ? (verifiedCoreTopics as any)[domain] : [];
+        const pending = selected.filter((topic: string) => !verified.includes(topic));
+        if (pending.length > 0) {
+            unverifiedCoreByDomain[domain] = pending;
+        }
+    });
+
+    const unverifiedRoleConcepts = {
+        core: (selectedRoleConcepts.core || []).filter((topic: string) => !(verifiedRoleConcepts.core || []).includes(topic)),
+        intermediate: (selectedRoleConcepts.intermediate || []).filter((topic: string) => !(verifiedRoleConcepts.intermediate || []).includes(topic)),
+        advanced: (selectedRoleConcepts.advanced || []).filter((topic: string) => !(verifiedRoleConcepts.advanced || []).includes(topic)),
+    };
+
+    const selectedRoleCount =
+        (selectedRoleConcepts.core || []).length +
+        (selectedRoleConcepts.intermediate || []).length +
+        (selectedRoleConcepts.advanced || []).length;
+    const verifiedRoleCount =
+        (verifiedRoleConcepts.core || []).length +
+        (verifiedRoleConcepts.intermediate || []).length +
+        (verifiedRoleConcepts.advanced || []).length;
+
+    return {
+        selectedTrack: student?.roleTrackProfile?.trackSelected || student?.outcomeAlignment?.role?.trackSelected || student?.outcomeAlignment?.trackSelected || "",
+        selectedCoreTopics,
+        verifiedCoreTopics,
+        unverifiedCoreByDomain,
+        selectedRoleConcepts,
+        verifiedRoleConcepts,
+        unverifiedRoleConcepts,
+        verifiedCoreCount,
+        verifiedRoleCount,
+        selectedRoleCount,
+        failedVerifications: Number(student?.failedVerifications || 0),
+        verificationScore: Number(student?.verificationScore || 0),
+    };
+}
+
+function hasOutcomeRecommendationData(student: any) {
+    return Boolean(student);
+}
+
+function generateOutcomeDrawbacks(student: any): DrawbackItem[] {
+    const readiness = getPlacementReadiness(student);
+    const gaps = readiness.performanceGaps || [];
+    const outcome = getOutcomeVerificationSummary(student);
+    const drawbacks: DrawbackItem[] = [];
+
+    Object.entries(outcome.unverifiedCoreByDomain).forEach(([domain, topics]) => {
+        drawbacks.push({
+            drawback: `${domain} still has ${topics.length} selected topic${topics.length > 1 ? "s" : ""} not yet verified.`,
+            suggestion: `Take the verification test again for ${domain} and focus first on ${topics.slice(0, 3).join(", ")}.`,
+        });
+    });
+
+    if (outcome.unverifiedRoleConcepts.core.length > 0 || outcome.unverifiedRoleConcepts.intermediate.length > 0 || outcome.unverifiedRoleConcepts.advanced.length > 0) {
+        const totalPendingRole =
+            outcome.unverifiedRoleConcepts.core.length +
+            outcome.unverifiedRoleConcepts.intermediate.length +
+            outcome.unverifiedRoleConcepts.advanced.length;
+
+        drawbacks.push({
+            drawback: `${totalPendingRole} role-aligned concept${totalPendingRole > 1 ? "s remain" : " remains"} selected but not yet verified for your chosen track.`,
+            suggestion: `Reattempt role verification by clearing ${(outcome.unverifiedRoleConcepts.core[0] || outcome.unverifiedRoleConcepts.intermediate[0] || outcome.unverifiedRoleConcepts.advanced[0] || "the pending concepts")} first, then move to the remaining unverified concepts.`,
+        });
+    }
+
+    if (outcome.failedVerifications > 0) {
+        drawbacks.push({
+            drawback: `You have ${outcome.failedVerifications} failed verification attempt${outcome.failedVerifications > 1 ? "s" : ""}, which suggests conceptual preparation is still incomplete.`,
+            suggestion: "Before retaking the test, revise the failed topics in small blocks, solve examples, and attempt a short self-check before the next verification.",
+        });
+    }
+
+    if (gaps.length === 0 && drawbacks.length === 0) {
+        return [
+            {
+                drawback: "Your readiness profile is strong, but premium companies will still expect sharper execution in mock interviews, timed coding, and project storytelling.",
+                suggestion: "Move from basic preparation to advanced preparation by practicing company-style mock rounds and refining your best project for deep technical discussion.",
+            },
+            {
+                drawback: "A strong score can still hide a conversion gap between preparation and interview performance.",
+                suggestion: "Use weekly timed assessments for coding, aptitude, and communication so your readiness remains interview-ready rather than theory-only.",
+            },
+        ];
+    }
+
+    const performanceGapDrawbacks = gaps.slice(0, 6).map((gap) => ({
+        drawback: `${gap.domain} is at ${gap.coverage}% coverage. ${gap.problem}`,
+        suggestion: gap.actionPlan.slice(0, 2).join(" "),
+    }));
+
+    const merged = [...drawbacks];
+    const seen = new Set(merged.map((item) => normalizeText(item.drawback)));
+    for (const item of performanceGapDrawbacks) {
+        const key = normalizeText(item.drawback);
+        if (!seen.has(key)) {
+            merged.push(item);
+            seen.add(key);
+        }
+    }
+
+    return merged.slice(0, 6);
+}
+
+function generateOutcomeRoadmap(student: any): RoadmapItem[] {
+    const readiness = getPlacementReadiness(student);
+    const gaps = readiness.performanceGaps || [];
+    const outcome = getOutcomeVerificationSummary(student);
+    const highGaps = gaps.filter((gap) => gap.riskLevel === "High");
+    const moderateGaps = gaps.filter((gap) => gap.riskLevel === "Moderate");
+    const primaryGap = highGaps[0] || moderateGaps[0] || gaps[0];
+    const secondaryGap = highGaps[1] || moderateGaps[1] || gaps[1];
+    const pendingCoreDomain = Object.keys(outcome.unverifiedCoreByDomain)[0];
+    const pendingCoreTopics = pendingCoreDomain ? outcome.unverifiedCoreByDomain[pendingCoreDomain] : [];
+    const pendingRoleTopic = outcome.unverifiedRoleConcepts.core[0] || outcome.unverifiedRoleConcepts.intermediate[0] || outcome.unverifiedRoleConcepts.advanced[0];
+
+    if (gaps.length === 0) {
+        return [
+            {
+                week: "Week 1-2",
+                priority: "High",
+                focus: pendingCoreDomain ? `${pendingCoreDomain} Verification Recovery` : "Outcome Verification Recovery",
+                tasks: [
+                    pendingCoreTopics.length > 0
+                        ? `Revise the still-unverified ${pendingCoreDomain} topics first: ${pendingCoreTopics.slice(0, 3).join(", ")}.`
+                        : "Review the selected but still-unverified outcome topics from your last test.",
+                    pendingRoleTopic
+                        ? `Retake role preparation by clearing ${pendingRoleTopic} and the remaining unverified track concepts.`
+                        : "Strengthen role-track concepts that were selected but not yet verified.",
+                    "Attempt the next verification only after finishing one focused revision cycle.",
+                ],
+            },
+            {
+                week: "Week 3-4",
+                priority: "Moderate",
+                focus: "Coverage Expansion",
+                tasks: [
+                    "Convert unverified topics into verified coverage domain by domain.",
+                    "Track which topics were selected, verified, and still pending after each test round.",
+                    "Use mistakes from the verification test as the next revision checklist.",
+                ],
+            },
+            {
+                week: "Week 5-6",
+                priority: "Moderate",
+                focus: "Outcome Alignment Consolidation",
+                tasks: [
+                    "Retake the remaining tests until core and role-topic verification coverage improves meaningfully.",
+                    "Consolidate verified topics into a role-wise quick revision sheet.",
+                    "Once verification coverage improves, move to broader readiness preparation.",
+                ],
+            },
+        ];
+    }
+
+    return [
+        {
+            week: "Week 1-2",
+            priority: highGaps.length > 0 ? "Critical" : "High",
+            focus: primaryGap ? `${primaryGap.domain} Recovery` : "Foundation Recovery",
+            tasks: primaryGap?.actionPlan.slice(0, 3) || [
+                "Review the highest-impact placement gaps first.",
+                "Set daily study targets for readiness improvement.",
+                "Track progress with one checkpoint at the end of each week.",
+            ],
+        },
+        {
+            week: "Week 3-4",
+            priority: secondaryGap ? "High" : "Moderate",
+            focus: secondaryGap ? `${secondaryGap.domain} Strengthening` : "Role and Aptitude Strengthening",
+            tasks: secondaryGap?.actionPlan.slice(0, 3) || [
+                "Strengthen role-specific concepts based on your selected track.",
+                "Practice coding and aptitude in timed conditions.",
+                "Review weak topics using mock-test mistakes.",
+            ],
+        },
+        {
+            week: "Week 5-6",
+            priority: "Moderate",
+            focus: "Placement Conversion Plan",
+            tasks: [
+                "Combine technical, aptitude, and communication practice into full mock rounds.",
+                "Refine resume, project explanations, and self-introduction for interviews.",
+                `Close the remaining visible gaps: ${(gaps.slice(0, 3).map((gap) => gap.domain).join(", ")) || "general readiness"}.`,
+            ],
+        },
+    ];
+}
+
+function generateOverallDrawbacks(student: any): DrawbackItem[] {
+    const academicDrawbacks = generateAcademicDrawbacks(student);
+    const outcomeDrawbacks = generateOutcomeDrawbacks(student);
+    const readiness = getPlacementReadiness(student);
+    const drawbacks: DrawbackItem[] = [];
+    const enrichmentCount = Array.isArray(student?.academicEnrichment) ? student.academicEnrichment.length : 0;
+    const engagementCount = Array.isArray(student?.academicEngagement) ? student.academicEngagement.length : 0;
+    const appliedCount = Array.isArray(student?.appliedKnowledge) ? student.appliedKnowledge.length : 0;
+    const attendance = Number(student?.attendance || 0);
+    const performanceGaps = readiness?.performanceGaps || [];
+    const strategyImprovements = readiness?.strategy?.improvements || [];
+    const enrichmentBreakdown = readiness?.enrichmentBreakdown;
+
+    const addUnique = (item: DrawbackItem) => {
+        const key = normalizeText(item.drawback);
+        if (!drawbacks.some((existing) => normalizeText(existing.drawback) === key)) {
+            drawbacks.push(item);
+        }
+    };
+
+    academicDrawbacks.forEach(addUnique);
+    outcomeDrawbacks.forEach(addUnique);
+
+    performanceGaps.slice(0, 8).forEach((gap: any) => {
+        addUnique({
+            drawback: gap.problem || `${gap.domain} has visible readiness gaps.`,
+            suggestion: Array.isArray(gap.actionPlan) && gap.actionPlan.length > 0
+                ? gap.actionPlan.slice(0, 2).join(" ")
+                : "Review this area and improve the missing coverage step by step.",
+        });
+    });
+
+    strategyImprovements.forEach((item: any) => {
+        addUnique({
+            drawback: `${item.area} needs attention across your overall profile.`,
+            suggestion: item.solution,
+        });
+    });
+
+    if (enrichmentCount === 0) {
+        addUnique({
+            drawback: "Your overall profile lacks enrichment evidence such as certifications, internships, workshops, or project-based achievements.",
+            suggestion: "Add at least one visible enrichment proof this cycle, preferably a certification, internship, or project that supports your target role.",
+        });
+    }
+
+    if (engagementCount === 0 && appliedCount === 0) {
+        addUnique({
+            drawback: "Applied learning and academic engagement are still thin, which makes the profile look theory-heavy instead of practice-backed.",
+            suggestion: "Balance academics with one practical activity such as a project, hackathon, workshop, technical club contribution, or competition entry.",
+        });
+    }
+
+    if (enrichmentBreakdown?.missing?.length > 0) {
+        enrichmentBreakdown.missing.forEach((category: string) => {
+            addUnique({
+                drawback: `${category} is missing from your current overall profile evidence.`,
+                suggestion: `Add at least one ${category.toLowerCase()}-based activity or achievement so your portal profile reflects broader development.`,
+            });
+        });
+    }
+
+    if (attendance > 0 && attendance < 75) {
+        addUnique({
+            drawback: `Attendance is currently ${attendance}%, which can affect consistency, internal marks, and semester performance stability.`,
+            suggestion: "Improve attendance discipline immediately and combine it with a weekly catch-up plan for missed classes and pending notes.",
+        });
+    }
+
+    if ((readiness?.performanceGaps?.length || 0) === 0 && drawbacks.length < 4) {
+        (readiness?.growthSuggestions || []).slice(0, 2).forEach((suggestion: string) => {
+            addUnique({
+                drawback: "Your profile is stable, but higher-tier growth still depends on converting current strengths into visible advanced outcomes.",
+                suggestion,
+            });
+        });
+    }
+
+    if (drawbacks.length === 0) {
+        addUnique({
+            drawback: "Your overall profile is balanced, but sustained growth needs stronger conversion of current work into measurable academic, technical, and portfolio outcomes.",
+            suggestion: "Keep academics stable, complete pending verifications, and add one role-aligned proof point every cycle so the dashboard stays growth-oriented instead of static.",
+        });
+    }
+
+    return drawbacks.slice(0, 14);
+}
+
+function generateOverallRoadmap(student: any): RoadmapItem[] {
+    const academicRoadmap = generateAcademicRoadmap(student);
+    const outcomeRoadmap = generateOutcomeRoadmap(student);
+    const readiness = getPlacementReadiness(student);
+    const enrichmentCount = Array.isArray(student?.academicEnrichment) ? student.academicEnrichment.length : 0;
+    const attendance = Number(student?.attendance || 0);
+
+    const firstPhaseTasks = [
+        ...(academicRoadmap[0]?.tasks || []).slice(0, 2),
+        ...(outcomeRoadmap[0]?.tasks || []).slice(0, 1),
+    ].slice(0, 3);
+
+    const secondPhaseTasks = [
+        ...(outcomeRoadmap[1]?.tasks || []).slice(0, 2),
+        ...(academicRoadmap[1]?.tasks || []).slice(0, 1),
+    ].slice(0, 3);
+
+    const finalPhaseTasks = [
+        ...(academicRoadmap[2]?.tasks || []).slice(0, 1),
+        ...(outcomeRoadmap[2]?.tasks || []).slice(0, 1),
+        enrichmentCount === 0
+            ? "Add one enrichment milestone such as a certification, internship, or project output before the next review."
+            : "Convert one existing strength into a stronger profile signal such as a better project, resume story, or certification."
+    ].slice(0, 3);
+
+    return [
+        {
+            week: "Week 1-2",
+            priority: "Critical",
+            focus: "Immediate Recovery Priorities",
+            tasks: firstPhaseTasks.length > 0 ? firstPhaseTasks : [
+                "Review your weakest academic and outcome-alignment areas first.",
+                "Stabilize study consistency and clear the highest-impact pending topics.",
+                attendance > 0 && attendance < 75 ? "Improve attendance and recover missed academic flow immediately." : "Create a disciplined weekly learning routine.",
+            ],
+        },
+        {
+            week: "Week 3-4",
+            priority: "High",
+            focus: "Capability Strengthening",
+            tasks: secondPhaseTasks.length > 0 ? secondPhaseTasks : [
+                "Strengthen the next set of weak areas from your dashboard modules.",
+                "Turn unverified or uncovered topics into verified progress.",
+                "Use mock tests, revision checklists, and tracked practice to improve consistency.",
+            ],
+        },
+        {
+            week: "Week 5-6",
+            priority: readiness?.tier === "Ready" ? "Moderate" : "High",
+            focus: "Profile Conversion and Growth",
+            tasks: finalPhaseTasks,
+        },
+    ];
+}
+
 function generateFallbackRecommendations(student: any, context: string) {
     const drawbacks: DrawbackItem[] = [];
     const roadmap: RoadmapItem[] = [];
@@ -291,6 +646,20 @@ function generateFallbackRecommendations(student: any, context: string) {
         return {
             drawbacks: generateAcademicDrawbacks(student),
             roadmap: generateAcademicRoadmap(student),
+        };
+    }
+
+    if (context === "outcome") {
+        return {
+            drawbacks: generateOutcomeDrawbacks(student),
+            roadmap: generateOutcomeRoadmap(student),
+        };
+    }
+
+    if (context === "overall") {
+        return {
+            drawbacks: generateOverallDrawbacks(student),
+            roadmap: generateOverallRoadmap(student),
         };
     }
 
@@ -375,14 +744,76 @@ function isGenericAcademicRoadmap(items: any[]) {
     return containsKnownGenericText || repeatedFocuses || repeatedTasks || thinTasks;
 }
 
+function isGenericOutcomeDrawbackList(items: any[]) {
+    if (!Array.isArray(items) || items.length === 0) return true;
+
+    const joined = items
+        .map((item) => `${normalizeText(item?.drawback)} ${normalizeText(item?.suggestion)}`)
+        .join(" ");
+
+    if (!joined) return true;
+
+    return GENERIC_OUTCOME_PHRASES.some((phrase) => joined.includes(phrase));
+}
+
+function isGenericOutcomeRoadmap(items: any[]) {
+    if (!Array.isArray(items) || items.length < 3) return true;
+
+    const focuses = items.map((item) => normalizeText(item?.focus || item?.title));
+    const uniqueFocuses = new Set(focuses.filter(Boolean));
+    const tasks = items.map((item) =>
+        Array.isArray(item?.tasks)
+            ? item.tasks.map((task: string) => normalizeText(task)).filter(Boolean)
+            : []
+    );
+    const flatTasks = tasks.flat();
+    const uniqueTasks = new Set(flatTasks);
+    const joined = `${focuses.join(" ")} ${flatTasks.join(" ")}`;
+
+    if (!joined.trim()) return true;
+
+    return (
+        GENERIC_OUTCOME_PHRASES.some((phrase) => joined.includes(phrase)) ||
+        uniqueFocuses.size <= 1 ||
+        (flatTasks.length > 0 && uniqueTasks.size <= 3) ||
+        tasks.some((phaseTasks) => phaseTasks.length < 2)
+    );
+}
+
+function shouldFallbackForContext(drawbacks: any[], roadmap: any[], context: string) {
+    if (!Array.isArray(drawbacks) || drawbacks.length === 0) return true;
+    if (!Array.isArray(roadmap) || roadmap.length === 0) return true;
+
+    if (context === "academic") {
+        return isGenericAcademicDrawbackList(drawbacks) || isGenericAcademicRoadmap(roadmap);
+    }
+
+    if (context === "outcome") {
+        return isGenericOutcomeDrawbackList(drawbacks) || isGenericOutcomeRoadmap(roadmap);
+    }
+
+    const joined = drawbacks
+        .map((item) => `${normalizeText(item?.drawback)} ${normalizeText(item?.suggestion)}`)
+        .join(" ");
+    const roadmapJoined = roadmap
+        .map((item) => `${normalizeText(item?.focus || item?.title)} ${Array.isArray(item?.tasks) ? item.tasks.map((task: string) => normalizeText(task)).join(" ") : ""}`)
+        .join(" ");
+
+    return (
+        !joined.trim() ||
+        !roadmapJoined.trim() ||
+        GENERIC_ACADEMIC_PHRASES.some((phrase) => joined.includes(phrase) || roadmapJoined.includes(phrase)) ||
+        GENERIC_OUTCOME_PHRASES.some((phrase) => joined.includes(phrase) || roadmapJoined.includes(phrase))
+    );
+}
+
 function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
     const mandatory = generateFallbackRecommendations(student, context);
     const aiDrawbacks = Array.isArray(aiResult?.drawbacks) ? aiResult.drawbacks : [];
     const aiRoadmap = Array.isArray(aiResult?.roadmap) ? aiResult.roadmap : [];
-    const useFallbackDrawbacks = context === "academic" && isGenericAcademicDrawbackList(aiDrawbacks);
-    const useFallbackRoadmap = context === "academic" && isGenericAcademicRoadmap(aiRoadmap);
+    const useFullFallback = shouldFallbackForContext(aiDrawbacks, aiRoadmap, context);
 
-    const mergedDrawbacks = useFallbackDrawbacks ? [] : [...aiDrawbacks];
+    const mergedDrawbacks = useFullFallback ? [] : [...aiDrawbacks];
     const existing = new Set(mergedDrawbacks.map((d: any) => String(d?.drawback || "").toLowerCase().trim()));
 
     for (const item of mandatory.drawbacks) {
@@ -393,7 +824,7 @@ function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
         }
     }
 
-    const finalRoadmap = !useFallbackRoadmap && aiRoadmap.length > 0
+    const finalRoadmap = !useFullFallback && aiRoadmap.length > 0
         ? aiRoadmap.map((item: any, index: number) => ({
             ...mandatory.roadmap[index],
             ...item,
@@ -408,9 +839,12 @@ function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
 }
 
 export async function POST(req: Request) {
+    let student: any = null;
+    let context = "overall";
     try {
         const body = await req.json();
-        const { student, context = "overall" } = body;
+        student = body?.student;
+        context = body?.context || "overall";
 
         if (!student) return NextResponse.json({ error: "Student data required" }, { status: 400 });
 
@@ -435,16 +869,35 @@ export async function POST(req: Request) {
         const semesterTrend = semesterSummary.records.length > 0
             ? semesterSummary.records.map((record) => `Sem ${record.semester}: SGPA ${record.sgpa.toFixed(2)}${record.arrears ? `, arrears ${record.arrears}` : ""}`).join(" | ")
             : "No semester records available";
+        const readiness = context === "outcome" && hasOutcomeRecommendationData(student) ? getPlacementReadiness(student) : null;
+        const outcomeGapSummary = readiness?.performanceGaps?.length
+            ? readiness.performanceGaps
+                .slice(0, 5)
+                .map((gap) => `${gap.domain}: ${gap.coverage}% coverage, ${gap.riskLevel} risk, missing ${gap.missingTopics.slice(0, 3).join(", ")}`)
+                .join(" | ")
+            : "No validated outcome gap data available";
+        const outcomeVerification = getOutcomeVerificationSummary(student);
+        const pendingOutcomeTopicsSummary = [
+            ...Object.entries(outcomeVerification.unverifiedCoreByDomain).map(([domain, topics]) => `${domain}: pending ${topics.slice(0, 4).join(", ")}`),
+            outcomeVerification.unverifiedRoleConcepts.core.length > 0 ? `Role Core pending: ${outcomeVerification.unverifiedRoleConcepts.core.slice(0, 4).join(", ")}` : "",
+            outcomeVerification.unverifiedRoleConcepts.intermediate.length > 0 ? `Role Intermediate pending: ${outcomeVerification.unverifiedRoleConcepts.intermediate.slice(0, 4).join(", ")}` : "",
+            outcomeVerification.unverifiedRoleConcepts.advanced.length > 0 ? `Role Advanced pending: ${outcomeVerification.unverifiedRoleConcepts.advanced.slice(0, 4).join(", ")}` : "",
+        ].filter(Boolean).join(" | ") || "No pending outcome-verification topics";
 
         const prompt = `Analyze this student profile for context: ${context}.
         CGPA: ${cgpa}, Arrears: ${student.standingArrears || 0}, Role: ${roleTrack}.
         Scores: Aptitude ${student.placementMetrics?.aptitudeScore || 0}%, Coding ${student.placementMetrics?.codingScore || 0}%, Comm ${student.placementMetrics?.communicationScore || 0}%.
         Semester records: ${semesterTrend}.
         Academic trend summary: Avg SGPA ${semesterSummary.averageSgpa}, Range ${semesterSummary.range}, Latest delta ${semesterSummary.latestDelta}, Trend ${semesterSummary.trendLabel}.
+        Outcome gaps: ${outcomeGapSummary}.
+        Outcome verification status: Verified core count ${outcomeVerification.verifiedCoreCount}, verified role count ${outcomeVerification.verifiedRoleCount}, failed verifications ${outcomeVerification.failedVerifications}, latest verification score ${outcomeVerification.verificationScore}.
+        Unverified / uncovered outcome topics: ${pendingOutcomeTopicsSummary}.
         Incomplete Topics: ${incompleteList.join(' | ') || "None"}.
         Identify 4-8 weaknesses/faults and a 6-week roadmap (3 phases: Week 1-2, Week 3-4, Week 5-6).
         For academic context, base the drawbacks on semester-score patterns, consistency, improvements, dips, and arrears.
         Even when the student is performing well, include at least 2 constructive growth opportunities instead of returning "no drawbacks".
+        For outcome context, use the actual performance gaps, verified topics, selected topics, remaining unverified topics, uncovered concepts, and verification attempts. Roadmap and drawbacks must explicitly target the topics that are still unverified or uncovered after the outcome-alignment tests. Do not return generic titles like "Skills Refinement" or repeated tasks across all phases.
+        For overall context, combine academic trends, placement readiness, outcome-alignment verification status, enrichment, engagement, attendance, and uncovered topics into one consolidated recommendation set. Do not return vague "profile is strong" or "no roadmap needed" text unless there are truly no identifiable improvement areas across all modules.
         Return purely JSON with "drawbacks" (drawback, suggestion) and "roadmap" (week, priority: Critical/High/Moderate/Standard, focus, tasks: string[]).`;
 
         const response = await ai.models.generateContent({
@@ -492,6 +945,9 @@ export async function POST(req: Request) {
         return NextResponse.json(merged);
     } catch (error) {
         console.error("AI recommendations failure:", error);
+        if (student) {
+            return NextResponse.json(generateFallbackRecommendations(student, context));
+        }
         return NextResponse.json({ error: "Service unavailable" }, { status: 500 });
     }
 }

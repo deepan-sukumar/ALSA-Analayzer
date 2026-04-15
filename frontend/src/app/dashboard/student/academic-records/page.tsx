@@ -9,6 +9,119 @@ import { useAuth } from "@/context/auth-context";
 import { FileText, TrendingUp, PlusCircle, BrainCircuit, Loader2, ShieldAlert, CheckCircle2, Activity, Calendar, BookOpen, Target, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+function buildAcademicFallback(student: any) {
+    const records = Array.isArray(student?.academicRecords)
+        ? [...student.academicRecords]
+            .map((record) => ({
+                semester: Number(record?.semester || 0),
+                sgpa: Number(record?.sgpa || 0),
+                arrears: Number(record?.arrears || 0),
+            }))
+            .filter((record) => record.semester > 0 && record.sgpa > 0)
+            .sort((a, b) => a.semester - b.semester)
+        : [];
+
+    const cgpa = Number(student?.cgpa || 0);
+    const standingArrears = Number(student?.standingArrears ?? student?.arrears ?? 0);
+    const drawbacks: { drawback: string; suggestion: string }[] = [];
+
+    const minSgpa = records.length > 0 ? Math.min(...records.map((record) => record.sgpa)) : 0;
+    const maxSgpa = records.length > 0 ? Math.max(...records.map((record) => record.sgpa)) : 0;
+    const latest = records.length > 0 ? records[records.length - 1] : null;
+    const previous = records.length > 1 ? records[records.length - 2] : null;
+    const latestDelta = latest && previous ? latest.sgpa - previous.sgpa : 0;
+    const criticalSemesters = records.filter((record) => record.sgpa < 6.5);
+
+    if (standingArrears > 0) {
+        drawbacks.push({
+            drawback: `Standing arrears are active (${standingArrears}), which can slow academic progress and eligibility.`,
+            suggestion: `Prioritize clearing ${standingArrears} pending subject${standingArrears > 1 ? "s" : ""} first with a dedicated weekly revision and test plan.`,
+        });
+    }
+
+    if (criticalSemesters.length > 0) {
+        drawbacks.push({
+            drawback: `Low-scoring semesters are still affecting your profile: ${criticalSemesters.map((record) => `Sem ${record.semester} (${record.sgpa.toFixed(2)})`).join(", ")}.`,
+            suggestion: "Revisit the lowest-scoring semesters first, identify the weak units, and target stronger recovery in the next result cycle.",
+        });
+    }
+
+    if (records.length >= 3 && (maxSgpa - minSgpa) >= 1.5) {
+        drawbacks.push({
+            drawback: `Semester performance is inconsistent, with SGPA ranging from ${minSgpa.toFixed(2)} to ${maxSgpa.toFixed(2)}.`,
+            suggestion: "Use a fixed weekly study routine and complete revision before internals so every semester stays more stable.",
+        });
+    }
+
+    if (latest && previous && latestDelta <= -0.4) {
+        drawbacks.push({
+            drawback: `Recent academic momentum dropped in Sem ${latest.semester} compared with the previous semester.`,
+            suggestion: "Review what changed in workload, preparation pattern, or difficult subjects and correct it early for the next term.",
+        });
+    }
+
+    if (cgpa > 0 && cgpa < 7.5) {
+        drawbacks.push({
+            drawback: `CGPA is currently ${cgpa.toFixed(2)}, so there is room to move from average to stronger academic standing.`,
+            suggestion: `Set a short-term CGPA target above ${Math.min(9.5, cgpa + 0.5).toFixed(2)} by improving higher-credit subjects first.`,
+        });
+    }
+
+    if (drawbacks.length === 0) {
+        drawbacks.push(
+            {
+                drawback: "No severe academic blocker is visible, but strong performers still need continuous score conversion to avoid a plateau.",
+                suggestion: "Use your best semester as a benchmark and push the next semester one step higher through advanced revision and tighter subject tracking.",
+            },
+            {
+                drawback: "Good grades can still hide topic-level gaps that show up in later semesters or placements.",
+                suggestion: "After each semester, list the toughest units and close them with short concept reviews and extra practice.",
+            }
+        );
+    }
+
+    const roadmap = [
+        {
+            week: "Week 1-2",
+            priority: standingArrears > 0 || criticalSemesters.length > 0 ? "Critical" : "High",
+            focus: standingArrears > 0 ? "Backlog and Weak Semester Recovery" : "Academic Trend Review",
+            tasks: standingArrears > 0
+                ? [
+                    "List all pending arrear subjects and split them into daily revision targets.",
+                    "Start revision from the weakest semester topics first.",
+                    "Solve previous university questions for the most difficult papers.",
+                ]
+                : [
+                    "Review your semester trend and mark the lowest-scoring subjects.",
+                    "Set one SGPA and CGPA target for the next academic cycle.",
+                    "Create a weekly timetable with concept study and revision blocks.",
+                ],
+        },
+        {
+            week: "Week 3-4",
+            priority: latestDelta < 0 ? "High" : "Moderate",
+            focus: "Consistency Improvement",
+            tasks: [
+                "Track weak topics weekly and convert them into revision checklists.",
+                "Attempt one timed test or previous paper every week.",
+                "Finish one full revision cycle before internal assessments begin.",
+            ],
+        },
+        {
+            week: "Week 5-6",
+            priority: "Moderate",
+            focus: cgpa >= 8 ? "Sustain Strong Performance" : "CGPA Upgrade Strategy",
+            tasks: [
+                "Protect high-credit subjects because they move CGPA faster.",
+                "Document repeated mistakes from tests and remove them before finals.",
+                "Convert strong academic work into projects, certifications, or subject mastery proof.",
+            ],
+        },
+    ];
+
+    return { drawbacks, roadmap };
+}
+
 export default function AcademicRecordsPage() {
     const router = useRouter();
     const { user } = useAuth();
@@ -27,21 +140,45 @@ export default function AcademicRecordsPage() {
                 const res = await fetch('/api/ai-recommendations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student: user, context: 'academic' })
+                    cache: 'no-store',
+                    body: JSON.stringify({ student: user, context: 'academic', requestedAt: Date.now() })
                 });
                 if (res.ok && !cancelled) {
                     const data = await res.json();
-                    setAiDrawbacks(data.drawbacks || []);
-                    setAiRoadmap(data.roadmap || []);
+                    const fallback = buildAcademicFallback(user);
+                    const nextDrawbacks = Array.isArray(data.drawbacks) && data.drawbacks.length > 0 ? data.drawbacks : fallback.drawbacks;
+                    const nextRoadmap = Array.isArray(data.roadmap) && data.roadmap.length > 0 ? data.roadmap : fallback.roadmap;
+                    setAiDrawbacks(nextDrawbacks);
+                    setAiRoadmap(nextRoadmap);
+                } else if (!cancelled) {
+                    const fallback = buildAcademicFallback(user);
+                    setAiDrawbacks(fallback.drawbacks);
+                    setAiRoadmap(fallback.roadmap);
                 }
             } catch (err) {
                 console.error('AI fetch failed', err);
+                if (!cancelled) {
+                    const fallback = buildAcademicFallback(user);
+                    setAiDrawbacks(fallback.drawbacks);
+                    setAiRoadmap(fallback.roadmap);
+                }
             } finally {
                 if (!cancelled) setAiLoading(false);
             }
         };
         fetchAI();
-        return () => { cancelled = true; };
+        const handleFocus = () => {
+            if (document.visibilityState === "visible") {
+                fetchAI();
+            }
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleFocus);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleFocus);
+        };
     }, [user]);
 
     return (
@@ -255,6 +392,7 @@ function PlanCard({ time, desc, title, steps, icon: Icon, color }: any) {
         </Card>
     );
 }
+
 
 
 

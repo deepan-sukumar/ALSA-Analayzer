@@ -17,8 +17,8 @@ import {
     ShieldCheck, ArrowUpRight, Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { calculatePRI, getPlacementReadiness } from "@/lib/placement-calculations";
-import { calculateEnrichmentScore, calculateEngagementScore } from "@/lib/academic-calculations";
+import { calculatePRI, getPlacementReadiness } from "@/lib/calculations/placement-calculations";
+import { calculateEnrichmentScore, calculateEngagementScore } from "@/lib/calculations/academic-calculations";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -39,7 +39,8 @@ export default function StudentDashboard() {
                 const res = await fetch('/api/ai-recommendations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student: user, context: 'overall' })
+                    cache: 'no-store',
+                    body: JSON.stringify({ student: user, context: 'overall', requestedAt: Date.now() })
                 });
                 if (res.ok && !cancelled) {
                     const data = await res.json();
@@ -53,7 +54,18 @@ export default function StudentDashboard() {
             }
         };
         fetchAI();
-        return () => { cancelled = true; };
+        const handleFocus = () => {
+            if (document.visibilityState === "visible") {
+                fetchAI();
+            }
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleFocus);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleFocus);
+        };
     }, [user]);
 
     // --- PRI Calculations ---
@@ -70,6 +82,14 @@ export default function StudentDashboard() {
     const firstName = user ? user.name.split(" ")[0] : "Student";
     const priValue = priData?.pri || 0;
     const riskLevel = readiness?.finalRisk?.label || "Low";
+    const recoveryLabel = readiness?.recoveryIndex?.label || "Academic Trajectory";
+    const recoveryValue = recoveryLabel === "Insufficient Data"
+        ? "Insufficient Data"
+        : readiness?.recoveryIndex?.trend === "improving"
+            ? "Up"
+            : readiness?.recoveryIndex?.trend === "declining"
+                ? "Down"
+                : "Stable";
 
     const getRiskStyles = (level: string) => {
         switch (level) {
@@ -126,18 +146,79 @@ export default function StudentDashboard() {
 
     const growthData = useMemo(() => {
         if (!user?.academicRecords || user.academicRecords.length === 0) {
-            return [
-                { name: "Sem 1", score: 65 },
-                { name: "Sem 2", score: 72 },
-                { name: "Sem 3", score: 68 },
-                { name: "Sem 4", score: 75 },
-            ];
+            return [];
         }
         return user.academicRecords.map(rec => ({
             name: `Sem ${rec.semester}`,
             score: parseFloat((rec.sgpa * 10).toFixed(1))
         }));
     }, [user?.academicRecords]);
+
+    const displayRoadmap = useMemo(() => {
+        if (aiRoadmap.length > 0) return aiRoadmap;
+
+        const smartRoadmap = readiness?.smartRoadmap || [];
+        if (smartRoadmap.length > 0) {
+            return smartRoadmap.map((item: any) => ({
+                week: item.week,
+                priority: item.priority,
+                focus: item.title || item.focus,
+                tasks: item.tasks || [],
+            }));
+        }
+
+        const weeklyRoadmap = readiness?.weeklyRoadmap || [];
+        if (weeklyRoadmap.length > 0) {
+            return weeklyRoadmap.map((item: any, idx: number) => ({
+                week: item.week || `Phase ${idx + 1}`,
+                priority: idx === 0 ? "High" : "Moderate",
+                focus: "Strategic Improvement",
+                tasks: item.tasks || [],
+            }));
+        }
+
+        return [];
+    }, [aiRoadmap, readiness]);
+
+    const displayDrawbacks = useMemo(() => {
+        if (aiDrawbacks.length > 0) return aiDrawbacks;
+
+        const merged: { drawback: string; suggestion: string }[] = [];
+        const addUnique = (item: { drawback: string; suggestion: string }) => {
+            const key = String(item.drawback || "").trim().toLowerCase();
+            if (!key) return;
+            if (!merged.some((existing) => String(existing.drawback || "").trim().toLowerCase() === key)) {
+                merged.push(item);
+            }
+        };
+
+        const gaps = readiness?.performanceGaps || [];
+        gaps.forEach((gap: any) => {
+            addUnique({
+                drawback: gap.problem || `${gap.domain} needs attention.`,
+                suggestion: Array.isArray(gap.actionPlan) && gap.actionPlan.length > 0
+                    ? gap.actionPlan.slice(0, 2).join(" ")
+                    : "Review this area and improve coverage steadily.",
+            });
+        });
+
+        const improvements = readiness?.strategy?.improvements || [];
+        improvements.forEach((item: any) => {
+            addUnique({
+                drawback: item.area,
+                suggestion: item.solution,
+            });
+        });
+
+        (readiness?.growthSuggestions || []).slice(0, 4).forEach((suggestion: string) => {
+            addUnique({
+                drawback: "Growth Opportunity",
+                suggestion,
+            });
+        });
+
+        return merged.slice(0, 14);
+    }, [aiDrawbacks, readiness]);
 
     // --- Tier Eligibility ---
     const tier = readiness?.tier || "Service Based";
@@ -201,23 +282,23 @@ export default function StudentDashboard() {
                 <StatCard
                     title="Readiness Status"
                     value={riskLevel}
-                    sub={`${readiness?.performanceGaps?.length || 0} Gaps Detected`}
+                    sub={`Unified risk score: ${readiness?.finalRisk?.index || 0}`}
                     icon={Activity}
-                    color={riskLevel === "Low" ? "emerald" : "orange"}
+                    color={riskLevel === "Low" ? "emerald" : riskLevel === "Moderate" ? "yellow" : "orange"}
                     isRisk
                 />
                 <StatCard
                     title="Tier Eligibility"
                     value={readiness?.tier || "Normal"}
-                    sub="Based on PRI Index"
+                    sub={readiness?.eligibleFor?.[0] || "Placement tier pending"}
                     icon={Briefcase}
                     color="purple"
                     isLarge
                 />
                 <StatCard
                     title="Recovery Trend"
-                    value={readiness?.recoveryIndex?.trend === "improving" ? "↑ Up" : readiness?.recoveryIndex?.trend === "declining" ? "↓ Down" : "→ Stable"}
-                    sub={readiness?.recoveryIndex?.label || "Academic Trajectory"}
+                    value={recoveryValue}
+                    sub={recoveryLabel}
                     icon={TrendingUp}
                     color="pink"
                 />
@@ -394,37 +475,43 @@ export default function StudentDashboard() {
                                     <CardDescription className="font-medium text-slate-600 dark:text-slate-400 mt-1">Score trajectory across semesters</CardDescription>
                                 </CardHeader>
                                 <CardContent className="relative z-10">
-                                    <div className="h-[200px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={growthData}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
-                                                <XAxis
-                                                    dataKey="name"
-                                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                                    tickLine={{ stroke: "#000000" }}
-                                                    tick={{ fontSize: 12, fill: "#000000", fontWeight: 600 }}
-                                                    dy={10}
-                                                />
-                                                <YAxis
-                                                    domain={[0, 100]}
-                                                    axisLine={{ stroke: "#000000", strokeWidth: 1 }}
-                                                    tickLine={{ stroke: "#000000" }}
-                                                    tick={{ fontSize: 12, fill: "#000000", fontWeight: 600 }}
-                                                />
-                                                <RechartsTooltip
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))' }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="score"
-                                                    stroke="#7c3aed"
-                                                    strokeWidth={4}
-                                                    dot={{ r: 6, fill: "#7c3aed", strokeWidth: 3, stroke: "#fff" }}
-                                                    activeDot={{ r: 8, strokeWidth: 4 }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                                    {growthData.length > 0 ? (
+                                        <div className="h-[200px] w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={growthData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeOpacity={0.2} />
+                                                    <XAxis
+                                                        dataKey="name"
+                                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                                        tickLine={{ stroke: "#000000" }}
+                                                        tick={{ fontSize: 12, fill: "#000000", fontWeight: 600 }}
+                                                        dy={10}
+                                                    />
+                                                    <YAxis
+                                                        domain={[0, 100]}
+                                                        axisLine={{ stroke: "#000000", strokeWidth: 1 }}
+                                                        tickLine={{ stroke: "#000000" }}
+                                                        tick={{ fontSize: 12, fill: "#000000", fontWeight: 600 }}
+                                                    />
+                                                    <RechartsTooltip
+                                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', background: 'hsl(var(--card))', color: 'hsl(var(--card-foreground))' }}
+                                                    />
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="score"
+                                                        stroke="#7c3aed"
+                                                        strokeWidth={4}
+                                                        dot={{ r: 6, fill: "#7c3aed", strokeWidth: 3, stroke: "#fff" }}
+                                                        activeDot={{ r: 8, strokeWidth: 4 }}
+                                                    />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    ) : (
+                                        <div className="flex h-[200px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center text-sm font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
+                                            Add semester records to unlock the academic consistency chart.
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
@@ -570,8 +657,8 @@ export default function StudentDashboard() {
                                             <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
                                             <p className="text-xs font-medium text-slate-500">Generating strategic roadmap...</p>
                                         </div>
-                                    ) : aiRoadmap.length > 0 ? (
-                                        aiRoadmap.slice(0, 6).map((week: any, idx: number) => {
+                                    ) : displayRoadmap.length > 0 ? (
+                                        displayRoadmap.slice(0, 6).map((week: any, idx: number) => {
                                             const colors = ["blue", "emerald", "purple", "blue", "emerald", "purple"];
                                             const icons = [Clock, Calendar, Target, Clock, Calendar, CheckCircle2];
                                             const Ic = icons[idx % 6];
@@ -611,9 +698,9 @@ export default function StudentDashboard() {
                                 <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
                                 <p className="text-sm font-medium text-slate-500">Analyzing your profile data for gaps...</p>
                             </div>
-                        ) : aiDrawbacks.length > 0 ? (
+                        ) : displayDrawbacks.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {aiDrawbacks.map((item: any, idx: number) => {
+                                {displayDrawbacks.map((item: any, idx: number) => {
                                     return (
                                         <div key={idx} className="p-5 rounded-2xl border-2 space-y-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden group/gap bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 hover:border-amber-300 dark:hover:border-amber-800/80">
                                             <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 opacity-0 group-hover/gap:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -844,3 +931,4 @@ function PlanCard({ time, desc, title, steps, icon: Icon, color }: any) {
 const Separator = ({ orientation, className }: { orientation: string, className: string }) => (
     <div className={cn(orientation === 'vertical' ? 'w-px h-full' : 'h-px w-full', className)} />
 );
+

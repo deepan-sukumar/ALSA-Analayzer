@@ -9,12 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/firebase";
 import { OutcomeAlignment, CoreAcademicProfile, RoleTrackProfile, CoreTopicSelection } from "@/types";
-import { calculateOutcomeAlignmentScore } from "@/lib/academic-calculations";
-import { PLACEMENT_ROLES, ROLE_SKILL_MATRIX, PlacementRole, getRolesForDepartment } from "@/lib/role-skills";
-import { CORE_ACADEMIC_TOPICS } from "@/lib/core-topics";
-import { getCoreSubjects } from "@/lib/department-core";
+import { calculateOutcomeAlignmentScore } from "@/lib/calculations/academic-calculations";
+import { PLACEMENT_ROLES, ROLE_SKILL_MATRIX, PlacementRole, getRolesForDepartment } from "@/lib/core/role-skills";
+import { CORE_ACADEMIC_TOPICS } from "@/lib/core/core-topics";
+import { getCoreSubjects } from "@/lib/core/department-core";
 import { Loader2, Save, BrainCircuit, GraduationCap, Target, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -763,5 +763,6 @@ export default function OutcomeAlignmentPage() {
         </div>
     );
 }
+
 
 

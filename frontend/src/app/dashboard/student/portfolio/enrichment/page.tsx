@@ -18,7 +18,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { calculateEnrichmentScore } from "@/lib/academic-calculations";
+import { calculateEnrichmentScore } from "@/lib/calculations/academic-calculations";
 import { toast } from "sonner";
 
 const Trophy = Medal;
@@ -202,6 +202,7 @@ export default function EnrichmentPage() {
         </div>
     );
 }
+
 
 
 

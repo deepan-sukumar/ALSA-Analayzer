@@ -29,10 +29,10 @@ import {
     Cell,
     Legend
 } from "recharts";
-import { onFacultyStudentsSnapshot } from "@/lib/firestore";
-import { calculatePRI, getPlacementReadiness } from "@/lib/placement-calculations";
+import { onFacultyStudentsSnapshot } from "@/lib/firebase/firestore";
+import { calculatePRI, getPlacementReadiness } from "@/lib/calculations/placement-calculations";
 import { User as AppUser } from "@/types";
-import { analyzeClassPerformance } from "@/lib/faculty-insights";
+import { analyzeClassPerformance } from "@/lib/faculty/faculty-insights";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -575,6 +575,70 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
     const [roadmap, setRoadmap] = useState<any[]>([]);
     const [isAiLoading, setIsAiLoading] = useState(true);
     const [expanded, setExpanded] = useState(false);
+    const readiness = useMemo(() => getPlacementReadiness(student), [student]);
+
+    const fallbackDrawbacks = useMemo(() => {
+        const merged: { drawback: string; suggestion: string }[] = [];
+        const addUnique = (item: { drawback: string; suggestion: string }) => {
+            const key = String(item.drawback || "").trim().toLowerCase();
+            if (!key) return;
+            if (!merged.some((existing) => String(existing.drawback || "").trim().toLowerCase() === key)) {
+                merged.push(item);
+            }
+        };
+
+        (readiness?.performanceGaps || []).forEach((gap: any) => {
+            addUnique({
+                drawback: gap.problem || `${gap.domain} needs attention.`,
+                suggestion: Array.isArray(gap.actionPlan) && gap.actionPlan.length > 0
+                    ? gap.actionPlan.slice(0, 2).join(" ")
+                    : "Review this area and improve coverage steadily.",
+            });
+        });
+
+        (readiness?.strategy?.improvements || []).forEach((item: any) => {
+            addUnique({
+                drawback: item.area,
+                suggestion: item.solution,
+            });
+        });
+
+        (readiness?.growthSuggestions || []).slice(0, 4).forEach((suggestion: string) => {
+            addUnique({
+                drawback: "Growth Opportunity",
+                suggestion,
+            });
+        });
+
+        return merged.slice(0, 12);
+    }, [readiness]);
+
+    const fallbackRoadmap = useMemo(() => {
+        const smartRoadmap = readiness?.smartRoadmap || [];
+        if (smartRoadmap.length > 0) {
+            return smartRoadmap.slice(0, 3).map((item: any) => ({
+                week: item.week,
+                priority: item.priority,
+                focus: item.title || item.focus,
+                tasks: item.tasks || [],
+            }));
+        }
+
+        const weeklyRoadmap = readiness?.weeklyRoadmap || [];
+        if (weeklyRoadmap.length > 0) {
+            return weeklyRoadmap.slice(0, 3).map((item: any, idx: number) => ({
+                week: item.week || `Phase ${idx + 1}`,
+                priority: idx === 0 ? "High" : "Moderate",
+                focus: "Strategic Improvement",
+                tasks: item.tasks || [],
+            }));
+        }
+
+        return [];
+    }, [readiness]);
+
+    const displayDrawbacks = drawbacks.length > 0 ? drawbacks : fallbackDrawbacks;
+    const displayRoadmap = roadmap.length > 0 ? roadmap : fallbackRoadmap;
 
     useEffect(() => {
         let cancelled = false;
@@ -585,7 +649,8 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
                 const res = await fetch('/api/ai-recommendations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student })
+                    cache: 'no-store',
+                    body: JSON.stringify({ student, context: 'overall', requestedAt: Date.now() })
                 });
                 if (res.ok && !cancelled) {
                     const data = await res.json();
@@ -599,8 +664,19 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
             }
         };
         fetchAiRecommendations();
-        return () => { cancelled = true; };
-    }, [student.id]);
+        const handleFocus = () => {
+            if (document.visibilityState === "visible") {
+                fetchAiRecommendations();
+            }
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleFocus);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleFocus);
+        };
+    }, [student]);
 
     // Determine risk level colour from PRI
     const pri = student.pri ?? student.priScore ?? 0;
@@ -655,9 +731,9 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
                             <div className="h-4 w-4 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
                             <span className="text-xs font-medium">Analyzing profile data...</span>
                         </div>
-                    ) : drawbacks.length > 0 ? (
+                    ) : displayDrawbacks.length > 0 ? (
                         <div className="space-y-4">
-                            {(expanded ? drawbacks : drawbacks.slice(0, 3)).map((item: any, gIdx: number) => (
+                            {(expanded ? displayDrawbacks : displayDrawbacks.slice(0, 3)).map((item: any, gIdx: number) => (
                                 <div key={gIdx} className="p-4 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 shadow-sm flex flex-col gap-2 relative overflow-hidden group/db">
                                     <div className="absolute top-0 left-0 w-1 h-full bg-amber-400 dark:bg-amber-600 rounded-l-xl opacity-50" />
 
@@ -680,12 +756,12 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
                                     </div>
                                 </div>
                             ))}
-                            {drawbacks.length > 3 && (
+                            {displayDrawbacks.length > 3 && (
                                 <button
                                     onClick={() => setExpanded(p => !p)}
                                     className="text-[11px] font-bold text-indigo-500 hover:text-indigo-700 transition-colors"
                                 >
-                                    {expanded ? "Show less ▲" : `+ ${drawbacks.length - 3} more drawbacks ▼`}
+                                    {expanded ? "Show less ▲" : `+ ${displayDrawbacks.length - 3} more drawbacks ▼`}
                                 </button>
                             )}
                         </div>
@@ -707,9 +783,9 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
                             <div className="h-4 w-4 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
                             <span className="text-xs font-medium">Generating roadmap...</span>
                         </div>
-                    ) : roadmap.length > 0 ? (
+                    ) : displayRoadmap.length > 0 ? (
                         <div className="space-y-2.5">
-                            {roadmap.slice(0, 3).map((phase: any, pIdx: number) => (
+                            {displayRoadmap.slice(0, 3).map((phase: any, pIdx: number) => (
                                 <div
                                     key={pIdx}
                                     className={`relative pl-4 py-2 pr-2 rounded-r-xl border-l-2 bg-slate-50/80 dark:bg-slate-800/40 ${phase.priority === "Critical" ? "border-l-red-400" :
@@ -744,3 +820,4 @@ function StudentInterventionRow({ student, onViewProfile }: { student: any, onVi
         </div>
     );
 }
+
