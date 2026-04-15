@@ -4,6 +4,15 @@ import { ROLE_SKILL_MATRIX, PlacementRole } from '@/lib/core/role-skills';
 
 type DrawbackItem = { drawback: string; suggestion: string };
 type RoadmapItem = { week: string; priority: string; focus: string; tasks: string[] };
+const GENERIC_ACADEMIC_PHRASES = [
+    "no critical drawbacks found",
+    "your academic profile looks strong",
+    "no recovery plan needed",
+    "your academic profile is on track",
+    "skills refinement",
+    "focus on core concepts",
+    "review technical documentation",
+];
 
 function parseStructuredJson(raw: string): any {
     const cleaned = String(raw || "")
@@ -326,12 +335,54 @@ function generateFallbackRecommendations(student: any, context: string) {
     return { drawbacks: drawbacks.slice(0, 8), roadmap: finalRoadmap };
 }
 
+function normalizeText(value: unknown) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function isGenericAcademicDrawbackList(items: any[]) {
+    if (!Array.isArray(items) || items.length === 0) return true;
+
+    const joined = items
+        .map((item) => `${normalizeText(item?.drawback)} ${normalizeText(item?.suggestion)}`)
+        .join(" ");
+
+    if (!joined) return true;
+
+    return GENERIC_ACADEMIC_PHRASES.some((phrase) => joined.includes(phrase));
+}
+
+function isGenericAcademicRoadmap(items: any[]) {
+    if (!Array.isArray(items) || items.length < 3) return true;
+
+    const focuses = items.map((item) => normalizeText(item?.focus || item?.title));
+    const uniqueFocuses = new Set(focuses.filter(Boolean));
+    const tasks = items.map((item) =>
+        Array.isArray(item?.tasks)
+            ? item.tasks.map((task: string) => normalizeText(task)).filter(Boolean)
+            : []
+    );
+    const flatTasks = tasks.flat();
+    const uniqueTasks = new Set(flatTasks);
+    const joined = `${focuses.join(" ")} ${flatTasks.join(" ")}`;
+
+    if (!joined.trim()) return true;
+
+    const containsKnownGenericText = GENERIC_ACADEMIC_PHRASES.some((phrase) => joined.includes(phrase));
+    const repeatedFocuses = uniqueFocuses.size <= 1;
+    const repeatedTasks = flatTasks.length > 0 && uniqueTasks.size <= 3;
+    const thinTasks = tasks.some((phaseTasks) => phaseTasks.length < 2);
+
+    return containsKnownGenericText || repeatedFocuses || repeatedTasks || thinTasks;
+}
+
 function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
+    const mandatory = generateFallbackRecommendations(student, context);
     const aiDrawbacks = Array.isArray(aiResult?.drawbacks) ? aiResult.drawbacks : [];
     const aiRoadmap = Array.isArray(aiResult?.roadmap) ? aiResult.roadmap : [];
-    const mandatory = generateFallbackRecommendations(student, context);
+    const useFallbackDrawbacks = context === "academic" && isGenericAcademicDrawbackList(aiDrawbacks);
+    const useFallbackRoadmap = context === "academic" && isGenericAcademicRoadmap(aiRoadmap);
 
-    const mergedDrawbacks = [...aiDrawbacks];
+    const mergedDrawbacks = useFallbackDrawbacks ? [] : [...aiDrawbacks];
     const existing = new Set(mergedDrawbacks.map((d: any) => String(d?.drawback || "").toLowerCase().trim()));
 
     for (const item of mandatory.drawbacks) {
@@ -342,7 +393,7 @@ function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
         }
     }
 
-    const finalRoadmap = aiRoadmap.length > 0
+    const finalRoadmap = !useFallbackRoadmap && aiRoadmap.length > 0
         ? aiRoadmap.map((item: any, index: number) => ({
             ...mandatory.roadmap[index],
             ...item,
