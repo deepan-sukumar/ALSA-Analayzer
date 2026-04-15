@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User as AppUser, Role } from "@/types";
-import { auth, db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase/firebase";
 import {
     signInWithPopup,
     GoogleAuthProvider,
@@ -26,9 +26,9 @@ import {
     updateUserDocument,
     getFacultyDocument,
     getUserByEmail,
-} from "@/lib/firestore";
-import { normalizeDepartment } from "@/lib/department-core";
-import { logSystemIssue } from "@/lib/issue-logger";
+} from "@/lib/firebase/firestore";
+import { normalizeDepartment } from "@/lib/core/department-core";
+import { logSystemIssue } from "@/lib/firebase/issue-logger";
 
 // ---- Auth Context ----
 interface AuthContextType {
@@ -439,11 +439,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await createUserDocument(uid, userData);
 
         if (finalRole === "student") {
+            const normalizedDepartment = normalizeDepartment(academicData.department || "");
             await setDoc(doc(db, "students", uid), {
                 uid,
                 name: name || "",
                 email: email || "",
-                department: academicData.department || "",
+                department: normalizedDepartment,
                 cgpa: parseFloat(academicData.cgpa) || 0,
                 pri: 0,
                 riskLevel: "High",
@@ -452,11 +453,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 updatedAt: new Date(),
             }, { merge: true });
         } else if (finalRole === "faculty") {
+            const normalizedDepartment = normalizeDepartment(academicData.department || "");
             await setDoc(doc(db, "faculty", uid), {
                 uid,
                 name: name || "",
                 email: email || "",
-                department: academicData.department || "",
+                department: normalizedDepartment,
                 approved: finalApproved,
                 designation: academicData.designation || "",
             }, { merge: true });
@@ -704,3 +706,4 @@ export function useAuth() {
     }
     return context;
 }
+

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { ROLE_SKILL_MATRIX, PlacementRole } from '@/lib/core/role-skills';
 import { getPlacementReadiness } from '@/lib/calculations/placement-calculations';
+import { analyzeClassPerformance } from '@/lib/faculty/faculty-insights';
 
 type DrawbackItem = { drawback: string; suggestion: string };
 type RoadmapItem = { week: string; priority: string; focus: string; tasks: string[] };
@@ -597,6 +598,25 @@ function generateOverallRoadmap(student: any): RoadmapItem[] {
     ];
 }
 
+function generateFacultyClassDrawbacks(classroom: any): DrawbackItem[] {
+    const students = Array.isArray(classroom?.students) ? classroom.students : [];
+    const classAnalysis = analyzeClassPerformance(students as any[]);
+
+    if (!classAnalysis.drawbacks.length) {
+        return [
+            {
+                drawback: "No major cohort-level blockers are visible right now, but the faculty team should still monitor weak modules before placement season intensifies.",
+                suggestion: "Review module-wise performance weekly and intervene early if trend lines start to dip in academics, core subjects, aptitude, or enrichment.",
+            },
+        ];
+    }
+
+    return classAnalysis.drawbacks.slice(0, 8).map((item) => ({
+        drawback: `${item.domain} affects ${item.affectedStudents} students at ${item.impactLevel.toLowerCase()} impact level.`,
+        suggestion: item.facultyActionPlan.slice(0, 2).join(" "),
+    }));
+}
+
 function generateFallbackRecommendations(student: any, context: string) {
     const drawbacks: DrawbackItem[] = [];
     const roadmap: RoadmapItem[] = [];
@@ -702,6 +722,13 @@ function generateFallbackRecommendations(student: any, context: string) {
     });
 
     return { drawbacks: drawbacks.slice(0, 8), roadmap: finalRoadmap };
+}
+
+function generateFallbackFromClassroom(classroom: any) {
+    return {
+        drawbacks: generateFacultyClassDrawbacks(classroom),
+        roadmap: [],
+    };
 }
 
 function normalizeText(value: unknown) {
@@ -841,20 +868,95 @@ function mergeAndEnsureCoverage(aiResult: any, student: any, context: string) {
 export async function POST(req: Request) {
     let student: any = null;
     let context = "overall";
+    let classroom: any = null;
     try {
         const body = await req.json();
         student = body?.student;
         context = body?.context || "overall";
+        classroom = body?.classroom;
 
-        if (!student) return NextResponse.json({ error: "Student data required" }, { status: 400 });
+        if (context === "faculty_class") {
+            if (!classroom || !Array.isArray(classroom?.students)) {
+                return NextResponse.json({ error: "Classroom data required" }, { status: 400 });
+            }
+        } else if (!student) {
+            return NextResponse.json({ error: "Student data required" }, { status: 400 });
+        }
 
         const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
         if (!geminiKey) {
+            if (context === "faculty_class") {
+                return NextResponse.json(generateFallbackFromClassroom(classroom));
+            }
             const result = generateFallbackRecommendations(student, context);
             return NextResponse.json(result);
         }
 
         const ai = new GoogleGenAI({ apiKey: geminiKey });
+        if (context === "faculty_class") {
+            const students = Array.isArray(classroom?.students) ? classroom.students : [];
+            const classAnalysis = analyzeClassPerformance(students as any[]);
+            const summary = students.slice(0, 12).map((entry: any) => {
+                const readiness = getPlacementReadiness(entry);
+                return `${entry.name || entry.registerNumber || entry.id}: dept ${entry.department || "Unknown"}, PRI ${readiness.pri}, tier ${readiness.tier}, CGPA ${entry.cgpa || 0}, arrears ${entry.standingArrears || entry.arrears || 0}`;
+            }).join(" | ");
+
+            const prompt = `Analyze this faculty classroom cohort and identify major class total gaps.
+            Department: ${classroom?.department || "Unknown"}.
+            Student count: ${students.length}.
+            Cohort summary: ${summary || "No student summary available"}.
+            Existing class analysis summary: ${classAnalysis.drawbacks.map((item) => `${item.domain}: affects ${item.affectedStudents}, impact ${item.impactLevel}, reason ${item.primaryReason}`).join(" | ") || "No class drawbacks detected"}.
+            Return 4 to 8 cohort-level drawback objects in JSON with "drawbacks" containing { drawback, suggestion }.
+            Each drawback must be faculty-actionable, specific to the cohort, and based on repeated class-level weaknesses.
+            Do not return generic "no issues" language unless the cohort truly has no visible pattern-level gaps.
+            Return "roadmap" as an empty array.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    temperature: 0.5,
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            drawbacks: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        drawback: { type: Type.STRING },
+                                        suggestion: { type: Type.STRING }
+                                    },
+                                    required: ["drawback", "suggestion"]
+                                }
+                            },
+                            roadmap: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        week: { type: Type.STRING },
+                                        priority: { type: Type.STRING },
+                                        focus: { type: Type.STRING },
+                                        tasks: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                    }
+                                }
+                            }
+                        },
+                        required: ["drawbacks", "roadmap"]
+                    }
+                }
+            });
+
+            const result = parseStructuredJson(response.text || "{}");
+            const drawbacks = Array.isArray(result?.drawbacks) ? result.drawbacks : [];
+            if (!drawbacks.length) {
+                return NextResponse.json(generateFallbackFromClassroom(classroom));
+            }
+            return NextResponse.json({ drawbacks, roadmap: [] });
+        }
+
         const cgpa = student.cgpa || "N/A";
         const roleTrack = student.roleTrackProfile?.trackSelected || student.outcomeAlignment?.trackSelected || "Not Selected";
 
@@ -945,6 +1047,9 @@ export async function POST(req: Request) {
         return NextResponse.json(merged);
     } catch (error) {
         console.error("AI recommendations failure:", error);
+        if (context === "faculty_class" && classroom) {
+            return NextResponse.json(generateFallbackFromClassroom(classroom));
+        }
         if (student) {
             return NextResponse.json(generateFallbackRecommendations(student, context));
         }

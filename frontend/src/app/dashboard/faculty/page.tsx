@@ -84,6 +84,8 @@ export default function FacultyDashboard() {
     const [allStudents, setAllStudents] = useState<AppUser[]>([]);
     const [loadingStudents, setLoadingStudents] = useState(true);
     const [selectedStudent, setSelectedStudent] = useState<AppUser | null>(null);
+    const [aiClassDrawbacks, setAiClassDrawbacks] = useState<{ drawback: string; suggestion: string }[]>([]);
+    const [aiClassLoading, setAiClassLoading] = useState(false);
 
     useEffect(() => {
         if (!facultyUser || !facultyUser.department) {
@@ -220,6 +222,56 @@ export default function FacultyDashboard() {
             ]
         };
     }, [allStudents]);
+
+    useEffect(() => {
+        if (!facultyUser?.department || allStudents.length === 0) {
+            setAiClassDrawbacks([]);
+            setAiClassLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        const fetchClassRecommendations = async () => {
+            setAiClassLoading(true);
+            try {
+                const res = await fetch('/api/ai-recommendations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    cache: 'no-store',
+                    body: JSON.stringify({
+                        context: 'faculty_class',
+                        classroom: {
+                            department: facultyUser.department,
+                            students: allStudents,
+                        },
+                        requestedAt: Date.now(),
+                    })
+                });
+                if (res.ok && !cancelled) {
+                    const data = await res.json();
+                    setAiClassDrawbacks(Array.isArray(data.drawbacks) ? data.drawbacks : []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch faculty class AI recommendations", error);
+            } finally {
+                if (!cancelled) setAiClassLoading(false);
+            }
+        };
+
+        fetchClassRecommendations();
+        const handleFocus = () => {
+            if (document.visibilityState === "visible") {
+                fetchClassRecommendations();
+            }
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleFocus);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleFocus);
+        };
+    }, [facultyUser?.department, allStudents]);
 
     const priGradient = analytics
         ? analytics.avgPRI >= 75 ? "from-emerald-500 to-emerald-700"
@@ -464,7 +516,32 @@ export default function FacultyDashboard() {
                                 </div>
                             </div>
                             <div className="p-6">
-                                {analytics.classInsights.drawbacks.length > 0 ? (
+                                {aiClassLoading ? (
+                                    <div className="text-center py-8 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                                        <p className="font-black text-slate-700 dark:text-slate-300">Analyzing cohort gaps...</p>
+                                        <p className="text-xs text-slate-500 mt-1">AI is generating class-level drawback insights.</p>
+                                    </div>
+                                ) : aiClassDrawbacks.length > 0 ? (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {aiClassDrawbacks.map((db: any, idx: number) => (
+                                            <div
+                                                key={idx}
+                                                className="group relative p-5 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 cursor-default bg-red-50/70 dark:bg-red-950/40 border-l-red-500 border border-red-100 dark:border-red-900/50"
+                                            >
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-300 mb-1">AI Cohort Gap</p>
+                                                        <p className="text-sm font-black text-red-700 dark:text-red-300 leading-relaxed">{db.drawback}</p>
+                                                    </div>
+                                                    <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                                                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200 dark:text-slate-100 mb-2">Recommended Faculty Action</p>
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{db.suggestion}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : analytics.classInsights.drawbacks.length > 0 ? (
                                     <div className="grid gap-4 md:grid-cols-2">
                                         {analytics.classInsights.drawbacks.map((db: any, idx: number) => {
                                             const isCritical = db.impactLevel === "Critical" || db.impactLevel === "High";

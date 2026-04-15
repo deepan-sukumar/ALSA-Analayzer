@@ -242,25 +242,53 @@ export function onStudentsSnapshot(callback: (students: any[]) => void) {
  */
 export function onDepartmentStudentsSnapshot(department: string, callback: (students: any[]) => void) {
     const deptToFetch = department && department !== "All" ? normalizeDepartment(department) : department;
-    const q = deptToFetch && deptToFetch !== "All"
-        ? query(
-            collection(db, "students"),
-            where("department", "==", deptToFetch)
-        )
+    const studentsQuery = deptToFetch && deptToFetch !== "All"
+        ? query(collection(db, "students"), where("department", "==", deptToFetch))
         : query(collection(db, "students"));
+    const usersQuery = deptToFetch && deptToFetch !== "All"
+        ? query(collection(db, "users"), where("department", "==", deptToFetch))
+        : query(collection(db, "users"));
 
-    return onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) {
-            console.log("Fetched Students: [] (Array empty)");
-        } else {
-            console.log("Fetched Students:", snapshot.docs.map(d => d.data()));
-        }
-        const students = snapshot.docs.map((doc) => ({
+    let latestStudents: any[] = [];
+    let latestUsers: any[] = [];
+
+    const emitMerged = () => {
+        const merged = new Map<string, any>();
+
+        latestStudents.forEach((student) => {
+            merged.set(student.id, student);
+        });
+
+        latestUsers
+            .filter((user) => user.role === "student")
+            .forEach((user) => {
+                const existing = merged.get(user.id) || {};
+                merged.set(user.id, { ...existing, ...user });
+            });
+
+        callback(Array.from(merged.values()));
+    };
+
+    const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
+        latestStudents = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
         }));
-        callback(students);
+        emitMerged();
     });
+
+    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+        latestUsers = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+        emitMerged();
+    });
+
+    return () => {
+        unsubscribeStudents();
+        unsubscribeUsers();
+    };
 }
 
 // ──────────────────────────────────
@@ -284,24 +312,56 @@ export function onFacultyStudentsSnapshot(department: string, callback: (student
 
     // Normalize to Canonical Form
     const dept = normalizeDepartment(department);
+    const studentsQuery = query(collection(db, "students"), where("department", "==", dept));
+    const usersQuery = query(collection(db, "users"), where("department", "==", dept));
 
-    const q = query(
-        collection(db, "students"),
-        where("department", "==", dept)
-    );
+    let latestStudents: any[] = [];
+    let latestUsers: any[] = [];
 
-    return onSnapshot(q, (snapshot) => {
+    const emitMerged = () => {
+        const merged = new Map<string, any>();
+
+        latestStudents.forEach((student) => {
+            merged.set(student.id, student);
+        });
+
+        latestUsers
+            .filter((user) => user.role === "student")
+            .forEach((user) => {
+                const existing = merged.get(user.id) || {};
+                merged.set(user.id, { ...existing, ...user });
+            });
+
+        const students = Array.from(merged.values());
         console.log(`Faculty Department: ${dept}`);
-        console.log(`Students fetched: ${snapshot.docs.length}`);
+        console.log(`Students fetched after merge: ${students.length}`);
+        callback(students);
+    };
 
-        const students = snapshot.docs.map((doc) => ({
+    const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
+        latestStudents = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
         }));
-        callback(students);
+        emitMerged();
     }, (error) => {
-        console.error("onFacultyStudentsSnapshot error:", error);
+        console.error("onFacultyStudentsSnapshot students error:", error);
     });
+
+    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+        latestUsers = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+        emitMerged();
+    }, (error) => {
+        console.error("onFacultyStudentsSnapshot users error:", error);
+    });
+
+    return () => {
+        unsubscribeStudents();
+        unsubscribeUsers();
+    };
 }
 
 /**
